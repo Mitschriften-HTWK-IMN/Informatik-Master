@@ -1,0 +1,1680 @@
+\documentclass[a4paper,12pt]{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{listings}
+\usepackage{float}
+\usepackage[ngerman]{babel}
+\usepackage{url}
+\usepackage{enumerate}
+
+
+%opening
+\title{Threadprogrammierung - Geser}
+\author{Hans-Christian Heinz\\
+hheinz@imn.htwk-leipzig.de\\
+CC-BY-NC-SA}
+\date{WS2013/14}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+\maketitle
+
+Literatur:
+\begin{itemize}
+ \item Kalvin Lin, Larry Snyder: Principles of Parallel Programming, Addison Wesley
+ \item Maurice Herliky, Nir Shavit: The Art of Multiprocessor Programming, Morgan Kaufmann 2008
+ \item Greg Andrews: Concurred Programming, Addison Wesley 2006
+ \item Brian O'Sullivan u.a.: Real World Haskell O'Reilly 2008 (besonders Kapitel 24)
+\end{itemize}
+
+\section{Grundbegriffe}
+Threads, Nichtdeterminismus, kritische Bereiche, Sperren\\
+\\
+\subsection{Threads}
+sequentiell (auch: seriell) := alle Rechenschritte laufen nacheinander ab in einer vorgegebenen Reihenfolge (\glqq{}Programmreihenfolge\grqq{}).\\
+Prozess (hier) := sequentieller Rechenvorgang\\
+Thread (engl. für \glqq{}Faden\grqq{} := leichte Variante eines sequentiellen Rechenvorgangs\\
+Unterschied zum Prozess:
+\begin{itemize}
+ \item kein eigener Speicherbereich
+ \item üblicherweise nicht vom Systemkern verwaltet
+\end{itemize}
+Leichtprozess (engl. lightweight process) := vom Systemkern verwaltet
+\\
+\\
+Allgemeine Tendenz:
+\begin{enumerate}
+ \item Systemkern möglichst Schlank halten
+ \item Systemkern möglichst selten benötigen
+\end{enumerate}
+
+Vorteile:
+\begin{itemize}
+ \item Wechsel zwischen Threads weniger aufwändig als Wechsel zwischen Prozessen
+ \item Threads benötigen weniger Speicher 
+ \item man kann viel mehr Threads ($\approx 10000$) als Prozesse laufen lassen ($< 100$)
+\end{itemize}
+
+Nachteil: Der Anwendungsprogrammierer muss sich um die Verwaltung der Threads kümmern.\\
+Viele Programmiersprachen bieten heutzutage Programmbibliotheken für Threads an. Beispiel: pThreads in C.\\
+\\
+parallel := mehrere Threads laufen gleichzeitig auf verschiedenen Rechnerkernen\\
+verschränkt (engl.: interleaved) := mehrere Threads laufen abwechselnd auf dem selben Rechnerkern\\
+concurrent (deutsch: \glqq{}nebenläufig\grqq{}) := nebeneinander laufend \\
+Deutscher Begriff \glqq{}Konkurrenz\grqq{} hat andere Bedeutung - Rivalität, Wettbewerb, passt hier nicht.\\
+Mischform zwischen parallel und verschränkt\\
+Unterschied: 
+\begin{description}
+ \item[Bearbeitungszeit (engl. wall clock time)]: umfasst auch Wartezeiten
+ \item[Rechenzeit (engl. cpu time)]: reine Zeit die der Prozessor dran rechnet
+\end{description}
+
+Amdahls Gesetz (Gene Amdahl 1967): Wenn eine Aufgabe auf eienm Prozessor die Bearbeitungszeit a benötigt und der Anteil $0\leq p\leq1$ davon parallelisierbar ist, dann benötigt sie auf n Prozessoren die Bearbeitungszeit
+$$a(1-p+\frac{p}{n})\text{.}$$
+Beispiel: $p=\frac{9}{10}, n=100$.\\
+Beschleunigung (engl. speedup) = $\frac{a}{a(1-p+\frac{p}{n}} = \frac{1}{1-\frac{9}{10}+\frac{9}{10*100}} \approx 9.17$\\
+Sogar $\underset{n\rightarrow\infty}{\lim }\frac{1}{1-p-\frac{p}{n}} = \frac{1}{1-p} = 10$.
+
+\subsection{Nicht-Determinismus}
+Nichtdeterminismus := Das Verhalten eines Systems hat Freiheitsgrade.\\
+Nichtdeterminismus hat zwei Anwendungen: 
+\begin{enumerate}
+ \item Möglichkeiten des Verhaltens der Systemumgebung zusammenfassen (engl. don't-know nondeterminism)
+ \item Spielraum für Implementierungen vorsehen (engl. don't-care nondeterminism)
+\end{enumerate}
+Hier: System von Threads.\\
+Man muss davon ausgehen, dass die Rechenschritte der Threads miteinander verschränkt sind. Die Reihenfolge der Schritte eines Threads miteinander verschränkt sind. Die Reihenfolge der Schritte eines Threads ist durch die Programm-Reihenfolge gegeben. Der \underline{Zeitplaner} (engl. scheduler) legt zur Laufzeit fest, in welcher Reihenfolge die Schritte zweier Threads zueinander ablaufen. Man möchte den Zeitplaner in seiner Entscheidungsfreiheit nicht unnötig einschränken. Man verlangt deshalb, dass das System von Threads korrekt arbeitet, unabhängig davon, wie der Zeitplaner die Verschränkung bildet. (don't know nondeterminism aus Sicht des Anwendungsprogrammierers, don't care nondeterminism aus Sicht des Zeitplaners).\\
+\\
+%KW43
+
+Threads sind \underline{asynchron}, d.h. sie laufen mit verschiedenen Geschwindigkeiten. Es treten Wartezeiten auf, deren Zeitpunkt und Dauer nicht vorhersagbar sind, z.B. cache miss (einige $\mu$s), Speicherseite muss neu geladen werden (\glqq{}pagefault\grqq{},einige ms). Da der Zeitplaner bei jedem Test eine andere Ausführungsreihenfolge wählen kann, ist der Test praktisch nicht reproduzierbar: Umstände des Wettrennens (engl. race conditions).\\
+Wegen der großen Anzahl möglicher Abläufe ist ein systematisches Testen aussichtslos (\glqq{}Zustandsexplosion\grqq{}). DIe Korrektheit der Implementierung muss deswegen mit anderen Mitteln nachgewiesen werden.
+
+\subsection{Kritische Bereiche}
+
+\begin{description}
+ \item[Gemeinsamer Speicher (engl. shared memory)]\quad\\
+      Speicherbereich, der von mehreren Threads genutzt werden kann
+      
+\end{description}
+
+Auch: gem. Objekt, gem. Variable.\\
+Im Zählerbeispiel ist z eine gemeinsame Variable.\\
+z++ wird vom Compiler sinngemäß so übersetzt:
+\begin{lstlisting}
+1. int temp:=z;
+2. temp:=temp+1
+3. z:=temp;
+\end{lstlisting}
+temp ist dabei eine lokale Variable (\glqq{}Hilfsvariable\grqq{},\glqq{}temporäre Variable\grqq{}).\\
+Jeder Thread hat seine eigene Version von temp.\\
+Beispielablauf für 3 verschränkte Threads. Sei z=0 zu Anfang.\\
+
+
+\begin{tabular}{ c | c | c | c}
+$p_1$ & $p_2$ & $p_3$ & z\\
+\hline\\
+\begin{tabular}{ l | r }
+  Zeile & temp \\
+  \hline\\
+  1. & 0 \\
+  \\
+  \\
+  \\
+  \\
+  \\
+  \\
+  2. & 1 \\
+  3. & \\
+\end{tabular} 
+& 
+\begin{tabular}{ l | r }
+  Zeile & temp \\
+  \hline\\
+  \\
+  1. & 0 \\
+  2. & 1 \\
+  3.\\
+  \\
+  \\
+  \\
+  \\
+  \\
+\end{tabular} 
+& 
+\begin{tabular}{ l | r }
+  Zeile & temp \\
+  \hline\\
+  \\
+  \\
+  \\
+  \\
+  1. & 1 \\
+  2. & 2 \\
+  3. & \\
+  \\
+  \\
+\end{tabular} 
+&
+
+\begin{tabular}{ l }
+  0 \\
+  \\
+  \\
+  \\
+  \\
+  1 \\
+  \\
+  \\
+  2 \\
+  \\
+  1\\
+\end{tabular} 
+\end{tabular}
+
+$p_1$,$p_2$,$p_3$ kommen sich gegenseitig in die Quere: \underline{Einmischung} (engl. interference). Einmischung kann es nur über gemeinsame Variablen geben.\\
+Eine Methode, um Einmischung zu vermeiden, ist die Verwendung von kritischen Bereichen.\\
+\begin{description}
+ \item[Kritischer Bereich (auch kritischer Abschnitt, engl. critical region, critical section)]\quad\\
+     Programmfragment, in dem sich zu jedem Zeitpunkt höchstens ein Thread befindet.
+\end{description}
+Ein kritischer Bereich ist ein \glqq{}exklusives\grqq{}Betriebsmittel: Wenn sich ein Thread im kritischen Bereich befindet, dann werden alle anderen THreads davon abgehalten, den kritischen Bereich zu betreten (\glqq{}gegenseitiger Ausschluss\grqq{}, engl. mutual exclusion).\\
+Analogie:
+\begin{description}
+ \item Thread$\overset{\wedge}{=}$Mensch
+ \item exklusives Betriebsmittel z.B. Telefonzelle, Sitzplatz, Tür, Brille, Helm, Löffel, Bleistift, Highlander
+\end{description}
+Beispiel in Pseudocode:
+\begin{lstlisting}
+ shared int z=0; 	\\Deklaration der gemeinsamen 
+ .			Variable z im Hauptprogramm
+ .
+ .
+ .
+ region z{		Kritischer Bereich. Nur innerhalb
+  z++;			des mit z markierten kritischen Bereichs
+ }			darf auf z zugegriffen werden.
+\end{lstlisting}
+
+Wenn kritische Bereiche als Sprachkonstrukt gegeben sind, kann der Compiler die Korrekte Verwendung kritischer Bereiche überprüfen.\\
+%Zeichnung hier
+Der kritische Bereich kann von mehreren Threads nicht nebeneinander abgearbeitet werden. Der kritische Bereich wird in einer gewissen Reihenfolge von den Threads abgearbeitet. (\glqq{}Serialisierbarkeit\grqq{}).\\
+Zwischenzustände in kritischen Bereichen sind von anderen Threads nicht beobachtbar. Der kritische Bereich wirkt wie eine einzelne Aktion: er ist "`unteilbar"' (auch: atomar, engl. atomic).
+
+\subsection{Sperren}
+
+Kritische Bereiche werden oft durch Sperren implementiert.
+\begin{description}
+ \item[Sperre (engl. lock)]\quad\\
+ Datenstruktur mit Zugriffsoperationenen "`belegen"' und "`freigeben"'.
+ \item[belegen(l):]\quad\\
+ Wartet solange, bis Sperre $\overbrace{l}^{\text{Attribut l.frei hat Wert true}}$ frei ist und $\underbrace{\text{sperrt sie dann}}_{\text{setzt l.frei auf false}}$
+ \item[freigeben(l)]\quad\\
+ Setzt l.frei auf true.
+\end{description}
+
+Zählerbeispiel mit Sperren (Pseudocode):
+\begin{lstlisting}
+ Im HP:
+  Sperre l erzeugen mit l.frei = false
+  Threads erzeugen
+  Threads starten
+  freigen(l)
+  In jedem Thread:
+    1.	belegen(l);
+    2.	int temp:=z;
+    3.	temp:=temp+1
+    4.	z:=temp;
+    5.	freigeben(l); 
+  * freigeben(l);
+\end{lstlisting}
+Die Sperre l macht aus 2.,3.,4. einen kritischen Bereich.\\
+l ist hier der gemeinsamen Variable z zugeordnet: "`l wacht über z"'.\\
+Geplanter Ablauf:\\
+%Zeichnung hier
+
+Beispielablauf für 2 Threads ab Zeile *
+
+\begin{tabular}{ c | c | c | c | c}
+$p_1$ & $p_2$ & z & l.frei & Bem.\\
+\hline\\
+\begin{tabular}{ l | r }
+  Zeile & temp \\
+  \hline\\
+  1.\\
+  \\
+  2. & 0 \\
+  3. & 1 \\
+  4.&\\
+  5.&\\
+  \\
+  \\
+  \\
+  \\
+\end{tabular} 
+& 
+\begin{tabular}{ l | r }
+  Zeile & temp \\
+  \hline\\
+  \\
+  1. & \\
+  | &\\
+  | &\\
+  | &\\
+  | &\\
+  1.&\\
+  2.& 1\\
+  3. & 2 \\
+  4. & \\
+  5. & \\
+\end{tabular} 
+& 
+
+\begin{tabular}{ l  }
+  0\\
+  \\
+  \\
+  \\
+  \\
+  \\
+  1.  \\
+  2. \\
+  3.  \\
+  \\
+  \\
+\end{tabular} 
+&
+\begin{tabular}{ l }
+  true \\
+  false\\
+  \\
+  \\
+  \\
+  1 \\
+  \\
+  \\
+  2 \\
+  \\
+  1\\
+\end{tabular} 
+&
+\begin{tabular}{ l }
+  \\
+  \\
+  $p_2$\\
+  \\
+  \
+  \\
+  \\
+  \\
+  \\
+  \\
+  \\
+\end{tabular} 
+\end{tabular}
+
+\section{Synchronisation}
+zeitl. Abläufe, serielle Abläufe, faire Mischung, Sicherheits- und Liveness-Eigenschaften, Handshake,Beispiel: Erzeuger/Verbraucher, Semaphore, bedingte kritische Bereiche, Lese/Schreiber-Problem, Konsitenzbegriffe
+
+\subsection{Zeitliche Abläufe}
+
+Vorgegeben: Menge A von Aktionen\\
+Ereignis (hier):= Paar, bestehend aus Aktion und Zeitpunkt\\
+Schreibweise: aktion(e),zeit(e) für Ereignis e\\
+Beispiele:
+\begin{itemize}
+ \item Schlacht bei Issos - 333 v.Chr.
+ \item erste bemannte Mondlandung 21. Juli 1969
+\end{itemize}
+
+Idealisierende Annahmen:
+\begin{enumerate}
+ \item Alles findet am selben Ort statt - also keine Probleme mit der Lichtgeschwindigkeit\\
+ Zeit (hier):= Newtonsche Zeit\\
+ Newtonsche Zeit verläuft
+ \begin{itemize}
+  \item absolut, d.h. unabhängig vom Beobachter
+  \item stetig, d.h. ohne Sprünge
+  \item unbeeinflusst von der Umgebung
+ \end{itemize}
+ \item Ein Ereignis hat die Dauer Null. Einen Zeitraum kann man darstellen durch die Ereignisse "`Beginn des Zeitraums"' und "`Ende des Zeitraums"'.
+ \item Gleichzeitige Ereignisse sind ausgeschlossen, d.h. zwei Ereignisse, die zur selben Zeit stattfinden, sind gleich.
+ $$zeit(e_1) = zeit(e_2) \Leftrightarrow e_1=e_2$$
+ 
+\end{enumerate}
+
+ diskreter zeitlicher Ablauf (auch: Geschichte):= Menge E von Ereignissen, so dass die Menge der Zeitpunkte von E
+ \begin{enumerate}
+  \item keinen Häufungspunkt hat
+  \item ein kleinstes Element hat
+ \end{enumerate}
+Sonst: stetige Abläuft, z.B. zeitl. Spannungsverlauf\\
+Mischformen: hybride Systeme, reaktive Systeme\\
+Interessant sind hier nicht die Zeitpunkte selber, sondern nur deren Lage zueinander, d.h. die Reihenfolge der Aktionen. Sonst: Echtzeitsysteme\\
+\\
+Def.:\\
+$e_1\rightarrow e_2$ Ereignis $e_1$ kommt vor Ereignis $e_2$. $(:\Leftrightarrow \text{zeit}(e_1)<\text{zeit}(e_2))$\\
+z.B. Hochmut $\rightarrow$ Fall\\
+Es gilt: $\rightarrow$ ist irreflexiv, transitiv, total, fundiert - Wohlordnung.\\
+Für einen nicht-leeren zeitl. Ablauf E sei min E definiert als das kleinste Element von E bzgl. $\rightarrow$, d.h. dasjenige $e\in E$, für das gilt:
+$$\forall f \in E \setminus \{e\}: e\rightarrow f$$
+Wohldefiniertheit dieser impliziten Definition gilt weil "`$\rightarrow$"' Wohlordnung ist.\\
+Das i-te Ereignis aus E ist für $i\in \mathbb{N}$, d.h. $i<|E|$ rekursiv definiert durch
+$$E^i := \left\{ 
+  \begin{array}{l l}
+    \text{min E} & \quad \text{, falls i = 1}\\
+    (E\setminus\{min E\})^{i-1} & \quad \text{, sonst}
+  \end{array} \right. $$
+Auch hier ist Wohldefiniertheit zu zeigen.\\
+\\
+Projektion auf eine Menge B von Aktionen ("`Sicht"')
+$$\pi_B(E):=\{e\in E|aktion(e)\in B\}$$
+Zustand zum Zeitpunkt $t\in \mathbb{R}$:
+$$z_t(E):=\{e\in E|\text{zeit}(e)\leq t\}$$
+
+\subsection{Serielle Abläufe}
+
+Serieller Ablauf := endl. oder unendl. Folge von Aktionen\\
+
+$$A^k:=\{i\in\mathbb{N}|u\leq k\} \rightarrow A $$
+endl. Folge von Elementen aus A mit Länge k
+$$A^* := \bigcup_{k\in\mathbb{N}_0}A^k $$
+$$A^\infty := \mathbb{N} \rightarrow A $$
+Operationen auf Aktionsfolgen:\\
+Für $x\in A^* \cup A^\infty \text{ ist } \#_x \in \mathbb{N}_0\cup\{\infty\}$\\
+Definiert durch:
+$$\#_x= \left\{ 
+  \begin{array}{l l}
+    \infty & \quad \text{, falls $x\in A^\infty$}\\
+    k & \quad \text{, falls $x\in A^k$}
+  \end{array} \right. $$
+ "`Länge von x"'\\
+ $\leq \leq(\mathbb{N}_0 \cup \{\infty\} x (\mathbb{N}_0\cup\{\infty\}$ definiert durch\\
+ $m\leq n \Leftrightarrow (n=\infty) \vee m,n \in \mathbb{N}_0 \wedge m\underset{\text{auf }\mathbb{N}_0}{\leq} n $\\
+ Es gilt: $\leq$ ist eine Wohlordnung und $\leq$ ist eine Fortsetzung von $\leq$ auf $\mathbb{N}_0$ nach $\mathbb{N}_0\cup\{\infty\}$.\\
+ Bemerkung: $\leq$ lässt sich weiter fortsetzen: "`Ordinalzahlen"'.\\
+ $\leq_{pre} \leq (A^* \cup A^\infty) x (A^* \cup A^\infty)$ definiert durch
+ $$x\leq_{pre} y \Leftrightarrow \#_x \leq \#_y \wedge \forall i \in \mathbb{N}:1\leq i \leq \#_x \Rightarrow x(i)=y(i) $$
+ "`x ist ein Anfangsstück von y"'\\
+ Vorsilbe (auch: Präfix, engl. prefix).
+ $$x<_{pre} y: \Leftrightarrow x \leq_{pre} y \wedge x \neq y \quad\quad\text{ strikter Anteil}$$
+ Rest: $A^*\cup A^\infty \setminus \{\epsilon\} \rightarrow A^*\cup A^\infty$\\
+ $rest(x)(i) = x(i+1)$\\
+ Konkatenation: $(A^* \cup A^\infty) x (A^* \cup A^\infty) \rightarrow (A^* \cup A^\infty) $ ist definiert durch 
+ $$(x*y)(i)= \left \{ 
+  \begin{array}{l l}
+    x(i) & \quad \text{, falls }i\leq \#_x\\
+    y(i-\#_x)& \quad \text{, sonst}
+  \end{array} \right. $$
+ Der zweite Fall tritt nur auf, wenn $\#_x\in \mathbb{N}_0$.\\
+ Projektion $\pi_B: (A^*\cup A^\infty) \rightarrow (A^* \cup A^\infty)$\\
+ rekursiv definiert durch:
+ $$\pi_B(x)= \left \{ 
+  \begin{array}{l l l l}
+    \epsilon & \quad \text{, falls }x=\epsilon\\
+    x(1) * \pi_B(rest(x))  & \quad \text{, falls } 0<\#_x<\infty \text{ und } x(1)\in B\\
+    \pi_B(rest(x)) & \quad \text{, falls } 0<\#_x<\infty \text{ und } x(1) \notin B\\
+    \underset{y\underset{pre}{<} x}{sup}\pi_B(y) & \quad \text{ , falls } \#_x = \infty
+  \end{array} \right. $$
+ 
+ \subsection{Faire Mischung}
+ 
+ Verhalten eines Threads = Aktionenfolge\\
+ Verhalten zweier nebeneinander laufender Threads = ?\\
+ Prozessalphabet $\alpha(p) :\Leftrightarrow$\\
+ Menge der Aktionen, die Thread p "`sehen kann"'\\
+ Es soll gelten: $\forall e \in E_i:$ aktion$(e) \in \underbrace{\alpha(p_i)}_{\text{Alphabet von Thread i}}$\\
+ zeitlicher Ablauf des Threads i\\
+ \\
+ $\alpha(p_i)\cap\alpha(p_2)$ = gemeinsame Aktionen von Thread 1 und 2.\\
+ Einigkeit:= Ereignisse mit gemeinsamen Aktionen finden gemeinsam statt
+ $$\pi_{\alpha(p_1)\cap\alpha(p_2)}(E_1\cup E_2) = E_1\cap E_2$$
+ 
+Äquivalent dazu:
+$$\pi_{\alpha(p_1)\cap\alpha(p_2)}(E_1\bigoplus E_2) = \emptyset$$
+
+$$\pi_{\alpha(p_1)}(E_2) =\pi_{\alpha(p_2)}(E_1)$$
+Faire Mischung: $E_1\cup E_2$\\
+wobei $E_i$ = Ereignisse des Threads i unter der Voraussetzung, dass Threads 1 und 2 sich einig sind.\\
+\\
+Es gilt: $\pi_{\alpha(p_i)}(E_1\cup E_2) = E_i)$,\\
+falls sich Threads 1 und 2 einig sind.
+ 
+ \paragraph{Definition:} $x\in (A\cup B)^* \cup (A\cup B)^\infty$ heißt eine \underline{faire Mischung} (engl. faire merge) von $y\in A^*\cup A^\infty$ und $z\in B^* \cup B^\infty$, wenn gilt:
+ $$\pi_A(x)=y$$ und $$\pi_B(x)=z$$
+
+ Bemerkung: "`fair"', weil weder y noch z in x zu kurz kommen.\\
+ Beispiel: Sei $A=\{0,1\}, B=\{2,3\}, y=(0,1,0,1,\dots) = (01)^\infty, z(2,3,2,3,\dots)=(23)^\infty$\\
+ Dann $x=(0,2,1,3,0,2,1,3,\dots)$ faire Mischung. Spezialfall "`perfect shuffle"'.\\
+ Aber auch $x=(2,0,1,3,2,0,1,3,\dots)$ faire Mischung\\
+ \\
+ x braucht nicht periodisch zu sein oder y und z mit gleicher Geschwindigkeit zu entwickeln. Motivation für faire Mischung: Faire Mischung von zeitlichen Abläufen. Verwandt mit Mischen zweier sortierter Folgen.
+ 
+ \subsection{Sicherheits- und Liveness-Eigenschaften}
+ 
+ \paragraph{Spezifikation:=}\quad\\
+ Beschreibung der gewünschten Eigenschaften des Systems aus Anwendersicht
+ 
+ \paragraph{Verifikation:=}\quad\\
+ Nachweis, dass das System die Spezifikation erfüllt.\\
+ Spezifikation eines seriellen Programms
+ $$f:Z\rightarrow Z$$
+ Vorbedingung: $pre_f:Z\rightarrow \mathbb{B}$\\
+ Nachbedingung: $post_f:Z\rightarrow \mathbb{B}$\\
+ 
+ %Zeichnungen Ablauf
+ 
+ $$pre_f(z)\Rightarrow post_f(f(z))$$
+ Zwei Prozeduraufrufe:\\
+ %Zeichnung
+ 
+ Problem bei Nebeneinander-Ablauf:\\
+ %Zeichnung
+ 
+ Prozedur-Ausführungen können sich überlappen! Die Ausführungen können sich über gem. Var. gegenseitig beeinflussen. Fazit: Verhalten im nebenläufigen Fall ist durch pre und post nicht mehr genau genug beschrieben.\\
+ \paragraph{Sicherheits- Eigenschaft (auch Konsistenz, Invariante, engl. safety property) :=}\quad\\
+ Eigenschaft, die für jeden Zustand gelten soll, und die sich nur auf vergangene Zustände bezieht.
+ 
+ \paragraph{Liveness- Eigenschaft (auch: Fortschritt, engl. liveness property, responsiveness):=}\quad\\
+ alle übrigen Eigenschaften von Abläufen; insbesondere, dass das System reagiert.\\
+ \\
+ Bemerkung:\\ 
+ Sicherheits-Eigenschaften sind unter $\leq_{pre}$ abgeschlossen.\\
+ Liveness-Eigenschaften benötigen besondere Beweismethoden.\\
+ Die meisten Eigenschaften sind Sicherheitseigenschaften.\\
+ \\
+ Intuitiv:\\
+ Sicherheits-Eigenschaften gerantieren, dass nichts unerwünschtes geschieht. ("`Verbot"')\\
+ Liveness-Eigenschaften garantieren, dass etwas erwünschtes schließlich geschieht ("`Versprechen"').\\
+ Falls zeitliche Schranken im Spiel sind:: Echtzeit-Eigenschaften.\\
+ Ein System, das nur wartet, erfüllt alle Sicherheits-Eigenschaften.\\
+ \\
+ Eigenschaften, die Sperren erfüllen sollen:
+ \begin{enumerate}
+  \item Gegenseitiger Ausschluss:\\
+  Die kritischen Bereiche zweier Threads überlappen nicht.\\
+  Sicherheits-Eigenschaft: "`für keinen Zeitpunkt gilt: Beide Threads befinden sich im kritischen Bereich."'
+  \item Verklemmungs-Freiheit:\\
+  Wenn ein Thread die Sperre erwerben möchte, dann gibt es einen Thread, der die Sperre bekommt.\\
+  Liveness-Eigenschaft: "`Falls Sperre zugeteilt werden soll, dann wird die Sperre auch schließlich zugeteilt."'
+  \item Kein Verhungern (auch: Fairness):\\
+  Jeder Thread, der eine Sperre erwerben möchte, bekommt sie schließlich auch.\\
+  Liveness-Eigenschaft.
+ \end{enumerate}
+
+ Methoden der Modellierung von Sicherheits- und Liveness-Eigenschaften:
+ \begin{itemize}
+  \item Formale Sprachen, insbesondere reguläre Ausdrücke
+  \item Prozessalgebra
+  \item temporale Logik: lineare oder verzweigend
+  \item Prädikatenlogik mit Abläufen als Objekten
+ \end{itemize}
+
+ Beispiel:\\
+ Ein gewisses Betriebsmittel sei dazu vorgegebenen.\\
+ Aktionen:\\
+ $bel_i$ Thread i belegt das BM\\
+ $fr_i$ Thread i gibt das BM frei\\
+ Bel:= $\{bel_i|i\in I\}$\\
+ Fr:= $\{fr_i|i\in I\}$\\
+ \\
+ Gegenseitiger Ausschluss:
+ $$x\in(\bigcup_{i\in I} bel_i fr_i)^*  \cup (\bigcup_{i\in I} bel_i fr_i)^\infty $$
+ 
+ Keine Sicherheits-Eigenschaft!\\
+ Es wird zusätzlich zu gegenseitigem Ausschluss gefordert, dass jeder Thread das belegte BM wieder freigeben muss.\\
+ \begin{enumerate}
+  \item Abschluss mit $\leq_{pre}$.
+  \item Aussage mit anderer Bedeutung verwenden.
+ \end{enumerate}
+
+ %KW 46
+ 
+ Gegenseitiger Ausschluss mit Prädikatenlogik:
+ $$\forall y \leq_{pre} x: 0\leq \#_yFr-\#_yBel\leq 1 $$
+ $\#_y Fr:=$ Anzahl der Fr-Aktionen im seriellen Ablauf y\\
+ $\#_y Fr:=\#_{\pi_{Fr}}(y)$
+ $$\forall i\in \mathbb{N}: Fr^i_x\leq Bel_x^i\leq Fr_x^{i+1} $$
+ dabei $Fr^i_x$ Position der i-ten Freigabeaktion in x.\\
+ Temporale Logik:\\
+ Aussagenlogik und zusätzlich temporale Quantoren\\
+ $\square$ "`immer"' (in der Zukunft)\\
+ $\lozenge$ "`schließlich"'\\
+ $\bigcirc$ "`im nächsten Zeitpunkt"'\\
+ Aussagen über Zustände zu verschiedenen Zeiten sind möglich.\\
+ \\
+ Definiere $zugr_x:=\#_xBel-\#_xFr+1$ "`Anzahl der Zugriffe im Zustand x."'\\
+ Gegenseitiger Ausschluss:
+ $$\square\; 0\leq zugr \leq 1 $$
+$ant_i$ Thread i beantragt Zugriff auf das Betriebsmittel\\
+Kein Verhungern:
+$$\#_x bel_i = \#_x ant_i $$
+(Das Verhalten der Sperre ist inbegriffen: $\#_x bel_i \leq \#_x ant_i$ Nur beantragte Betriebsmittel können zugegriffen werden.)
+
+\subsection{Signale}
+
+Handshake (auch: Signal):= Hinweis an einen Prozess, dass er weitermachen kann\\
+Analogie: Bei "`Los geht's los."' Staffellauf. Anschlusszug muss warten. Becher vor Kaffeezulauf.\\
+Signale sorgen dafür, dass gewissen Reihenfolgen eingehalten werden ("`Koordination"',Thread-Synchronisation). Ein Signal kann durch eine Sperre implementiert werden:\\
+Signalisieren = freigeben\\
+warten auf Signal = belegen\\
+Beispiel:\\
+\begin{tabular}{l r}
+  Thread $p_1$: & Thread $p_2$:\\
+  $S_1$; & belegen(l);\\
+  freigeben(l) & $S_2$;
+\end{tabular}\\
+
+%Grafik: illustration Ablauf Signal
+
+l muss freigegeben worden sein, bevor es wieder belegt werden kann, also findet $S_1$ vor $S_2$ statt. Durch die Verwendung von Signalen schränkt man die Menge der Abläufe ein.\\
+Vorteil: unerwünschte Abläufe werden ausgeschlossen.\\
+Nachtei: weniger Parallelität\\
+\\
+Extremfall: nur ein serieller Ablauf bleibt übrig, abgesehen vom Koordinationsaufwand gleichwertig mit einem seriellen Programm.\\
+Beispiel: Erzeuger/Verbraucher-Problem\\
+
+1. Version: 1 Erzeuger, 1 Verbraucher, 1 Datenblock wird zwischengespeichert\\
+Erzeuger und Verbraucher sind Threads. Der Erzeuger produziert Datenblöcke und der Verbraucher verarbeitet sie. Der letzte erzeugte und noch nicht verarbeitete Datenblock wird in einem Puffer zwischengespeichert. (Hier Puffer = Warteschlange der Länge 1)\\
+\begin{lstlisting}
+  Thread erz:
+    wiederhole
+      herstellen(datenblock);
+      einreihen(puffer, datenblock);
+  
+  Thread verb:
+    wiederhole
+      abholen(puffer,datenblock);
+      verarbeiten(datenblock);
+      
+  Prozedur einreihen(puffer,datenblock);
+    belegen(leer);
+    kopieren(datenblock,puff);
+    freigeben(voll);
+    
+  Prozedur abholen(puffer,datenblock);
+    belegen(voll);
+    kopieren(puffer,datenblock);
+    freigeben(leer);
+    
+  HP:
+    Sperren voll, leer anlegen
+    Threads erz und verb anlegen und starten
+    freigen(leer);
+\end{lstlisting}
+
+Kausalitätsgraph:\\
+ %Grafik: Kausalitätsgraph
+ \\
+Petri-Netz dazu:\\
+ %Grafik: Petri-Netz
+ \\
+elementare Ereignisstruktur: durch Abrollen des Kausalitätsgraphen.\\
+Ereignis $a^i$: Aktion a findet zum i-ten Mal statt\\
+Wh.:\\
+\quad $e_1\rightarrow e_2$: Ereignis $e_1$ kommt vor $e_2$\\
+%Grafik: Ereignisstruktur
+
+%KW47
+
+%Grafik: Sperren -  leer, voll, puffer, datenblock
+
+Verwendung der Sperren "`leer"' und "`voll"' bewirkt hier:
+\begin{enumerate}
+ \item 2. und 5. werden als kritische Bereiche behandelt
+ \item 2. und 5. werden nur abwechselnd ausgeführt
+\end{enumerate}
+
+"`leer = 1"' und "`voll = 1"' schließen sich gegenseitig aus:
+$$\square \text{ leer} = 0 \vee \text{ voll} = 0 $$
+
+\subsection{Semaphore}
+
+Semaphor := Datenstruktur mit Operationen "`belegen"' und "`freigeben"'.
+\begin{description}
+ \item[belegen(l):]  wartet auf l.frei $>$ 0 und setzt dann l.frei auf l.frei-1.
+ \item[freigeben(l):] setzt l.frei auf l.frei+1
+\end{description}
+
+Verwandschaft mit Klammerausdrücken:
+$$(()())$$
+$$fr\;fr\;bel\;fr\;bel\;bel$$
+
+l.frei hier: Anzahl der noch offenen Klammern
+
+\subsection{Beispiel: Erzeuger/Verbraucher, 2. Version}
+
+wie 1. Version, nur Puffer für N Datenblöcke. $N>0$ dazu vorgegeben.\\
+Threads von 1. Version bleiben.
+\begin{lstlisting}
+  Prozedur einreihen(puffer, datenblock):
+    belegen(nichtvoll);
+    stock(puffer, datenblock);
+    freigeben(nichtleer);
+    
+  Prozedur abholen(puffer, datenblock):
+    belegen(nichtleer);
+    datenblock := top(puffer);
+    pop(puffer);
+    freigeben(nichtvoll);
+\end{lstlisting}
+
+Warteschlange\\
+
+%Grafik Warteschlange
+
+Im Hauptprogramm:
+\begin{lstlisting}
+  puffer := empty();
+  Semaphor nichtvoll, nichtleer anlegen
+  Threads erzeugen und starten.
+    freigeben^N(nichtvoll)
+    (:=n-mal freigeben(nichtvoll))
+\end{lstlisting}
+
+Invariante I:
+$$ 0\leq \text{nichtvoll.frei} \wedge 0\leq\text{nichtleer.frei} \wedge \underbrace{\text{nichtvoll.frei} + \text{nichtleer.frei} \leq N}_{\sum}$$
+
+\subsection{Bedingte Kritische Bereiche}
+
+Ein kritischer Bereich soll nur betreten werden, wenn eine gewisse Bedingung B an die gemeinsame Variable gilt.
+\begin{enumerate}
+ \item B vor dem Betreten überprüfen:\\
+ Problem: B kann beim Betreten bereits wieder verletzt sein.
+ \item B im kritischen Bereich überprüfen:\\
+ Problem: Solange B nicht gilt, soll der Thread warten. Damit blockiert er aber den kritischen Bereich.
+ \end{enumerate}
+ Fazit: Mit kritischen Bereichen kann man das Problem nicht lösen. Abhilfe: Neues Konstrukt "`bedingter kritscher Bereich"'.
+ \begin{lstlisting}
+  bedingter kritischer Bereich (Per Brinch Hansen, 1973)
+  
+  kritisch v{
+    //gemeinsame Variablen
+    
+    warte auf B;
+  }
+ \end{lstlisting}
+
+ Wenn B gilt, wird weiter gerechnet. Sonst wird gewartet, und während des Wartens wird der kritische Bereich vorübergehend verlassen, um anderen Threads die Gelegenheit zu geben, den kritischen Bereich zu verlassen.\\
+ Monitor (hier):=\\
+ bedingter kritischer Bereich, der an eine Methode gekoppelt ist.\\
+ Bemerkung: Es gibt Probleme mit der Schachtelung von Monitor-Aufrufen.
+ 
+ \subsection{Beispiel: Erzeuger/Verbraucher, 3. Version}
+
+ beliebig viele Erzeuger, beliebig viele Verbraucher, $N>0$ Plätze in der Warteschlange.
+ \begin{lstlisting}
+  Prozedur einreihen(puffer, datenblock):
+    kritisch puffer{
+      warte auf laenge(puffer) < N; //lange(puffer) liefert Fuellstand
+      stock(puffer, datenblock);
+    }
+    
+  Prozedur abholen(puffer, datenblock):
+    kritisch puffer{
+      warte auf laenge(puffer)>0;
+      datenblock := top(puffer)
+      pop(puffer);
+    }
+ 
+  Im HP:
+    gemeinsam puffer := empty(); 
+    /*"gemeinsam" soll andeuten, dass es sich um 
+    eine gemeinsame Variable handelt*/
+ \end{lstlisting}
+Variante mit Bedingungsvariablen
+\begin{lstlisting}
+  Prozedur einreihen(puffer, datenblock):
+    kritisch puffer{
+      warte auf nichtvoll;
+      stock(puffer, datenblock);
+      nichtleer := true;
+      nichtvoll := (laenge(puffer) <N);
+    }
+  
+  Prozedur abholen(puffer,datenblock):
+    kritisch puffer{
+      warte auf nichtleer;
+      datenblock := top(puffer);
+      pop(puffer);
+      nichtvoll := true;
+      nichtleer := (laenge(puffer) > 0);
+    }
+  
+  Im HP:
+    gemeinsam puffer := empty();
+    bedvar nichtvoll, nichtleer := false;
+    nichtvoll := true;
+\end{lstlisting}
+
+\subsection{FEHLT}
+
+\subsection{Lese/Schreib-Sperren}
+
+Ausgangssituation: Mehrere Threads greifen lesend oder schreibend auf eine gemeinsame Variable zu. Mehrere Leser können ohne gegenseitigen Ausschluss zugreifen: Lesevorgänge stören sich gegenseitig nicht.\\
+Lese/Schreib-Konflikt: Die gemeinsame Variable darf nicht gleichzeitig gelesen und geschrieben werden.\\
+Schreib-/Schreib-Konflikt:
+Die gemeinsame Variable darf nicht von 2 Threads gleichzeitig geschrieben werden.\\
+2 Varianten:
+\begin{enumerate}
+ \item Ein Leser muss nur dann warten, wenn gerade ein Schreiber aktiv ist
+ \item Ein Schreiber muss nur auf Leser warten, die gerade aktiv sind: Schreiber haben Vorrang.
+ \end{enumerate}
+Autor: Courtois et al. 1971.
+
+\section{Feinkörnige Concurrency (Nebenläufigkeit)}
+Beispiel: Bounded Queue
+
+Bei einem hohen Grad an Nebenläufigkeit wird der Zugriff auf das gemeinsame Objekt zum Flaschenhals. Die Threads können immer nur nacheinander zugreifen.\\
+Abhilfe: 4 Techniken
+\begin{enumerate}
+ \item Feinkörnige Synchronisation:\\
+  Statt das gemeinsame Objekt zu sperren, werden nur die betroffenen Komponenten gesperrt. Nur wenn zwei Threads auf dieselbe Komponente zugreifen wollen, muss einer warten.
+ \item Optimistische Synchronisation:\\
+  Während der Suche nach einer gewissen Komponente des gemeinsamen Objekts keine Sperren erwerben. Sobald die Komponente gefunden wurde, diese Komponente sperren und überprüfen, ob sich die Komponente inzwischen verändert hat.
+ \item Faule Synchronisation:\\
+  Löschen einer Komponente wird in 2 Phasen durchgeführt:
+  \begin{enumerate}
+   \item als gelöscht markieren, zum Beispiel durch setzen eines geeigneten Bits ("`Logisches Löschen"')
+   \item aus der Datenstruktur aushängen ("`physikalisches Löschen"')
+  \end{enumerate}
+ \item nicht-blockierende Synchronisation:\\
+ Statt Sperren atomare Operationen verwenden.
+\end{enumerate}
+
+\subsection{Beispiel: Mengen implementiert durch verkettete Listen}
+
+\begin{lstlisting}
+ Schnittstelle:
+  Typ Set<T>
+   
+   Prozedur empty
+    Parameter: keine
+    Wirkung: erzeugt leere Menge
+    Ergebnis: das erzeugte Objekt
+\end{lstlisting}
+\begin{lstlisting}
+  Prozedur add
+    Parameter: Set <T> s, T x
+    Wirkung: fuegt x zu s hinzu s:=s u {x}
+    
+  Prozedur remove
+    Parameter: Set <T> s, T x
+    Wirkung: entfernt x aus s s:= s\{x}
+    
+  Prozedur contains
+    Parameter: Set <T> s, T x
+    Ergebnis: Wahrheitswert von "s enthaelt x"
+\end{lstlisting}
+
+Implementierung durch verkettete Listen mit Wächtern, sortiert nach Streuwert.\\
+Listenelemente (Typ Node) habe folgende Attribute:
+\begin{description}
+ \item[T item] $\rightarrow$ das Element der Menge
+ \item[int key] $\rightarrow$ den Streuwert des Elements
+ \item[Node next] $\rightarrow$ Zeiger auf das nächste Element
+\end{description}
+
+Wächter (engl. sentinel):= "`künstliches Listenelement, das Anfang oder Ende der Liste markiert.\\
+\\
+Beispiel:\\
+%Grafik hier
+Menge {1,25} der Streuwerte\\
+Streuwerte sind sortiert: $-\infty < 1 < 25 < +\infty$\\
+Klasse List$<T>$ mit Attribut head vom Typ Node$<T>$.\\
+Invarianten?
+
+\subsection{Implementierung mit feinkörniger Synchronisation}
+
+Eine Sperre genügt nicht\\
+Beispiel:\\
+%grafik hier
+\underline{b löschen:} Sperre in a erwerben, a.next auf c setzen, Sperre freigeben\\
+\underline{c löschen:} Sperre in b erwerben, b.next auf d setzen, Sperre freigeben\\
+Wirkung: nur b wird gelöscht!\\
+Zwei Sperren:\\
+Um b zu löschen, muss die Sperre in a und die Sperre in b erworben werden.\\
+Um c zu löschen, muss die Sperre in b und die Sperre in c erworben werden.\\
+$\Rightarrow$ Konflikt. Ein Löschvorgang muss auf den anderen warten.\\
+Node$<T>$ bekommt neues Attribut lk vom Typ Lock.
+\begin{lstlisting}
+ Methode lock():
+  this.lk.lock();
+ Methode unlock();
+  this.lk.unlock();
+  
+ public static boolean add(Finelist<T> list, T item)
+  int key = hash(item);
+  Node<T> pred, curr
+  try{
+    pred = list.head;
+    curr = pred.next;
+    pred.lock();
+    curr.lock();
+    while(curr.key < key){
+      pred.unlock();
+      pred = curr;
+      curr = curr.next;
+      curr.lock();
+    }
+    if(curr.key != key){
+      Node<T> node = new Node(item);
+      node.next = curr;
+      pred.next = node;
+    }
+  }
+  finally{
+    curr.unlock();
+    pred.unlock();    
+  }
+ }
+ 
+ Prozeduren remove und contains aehnlich
+ \end{lstlisting}
+
+ \subsection{Implementierung mit Optimistischer Synchronisation}
+ 
+ \begin{lstlisting}
+  public static void add(OptList<T> list, T item){
+    int key = hash(item);
+    Node<T> pred, curr;
+    pred = list.head;
+    curr = pred.next;
+    while(curr.key <= key){
+      pred = curr;
+      curr = curr.next;
+    }
+    
+    try{
+     pred.lock(); 
+     curr.lock();
+     if(validate(list,pred,curr)){
+	if(curr.key!=key){
+	  Node<T> node = new Node<T>(item);
+	  node.next = curr;
+	  pred.next = node;
+	}
+      }
+    } finally{
+      pred.unlock();
+      curr.unlock();
+    }
+  }
+  
+  private static boolean validate(OptList<T> list, Node<T> pred, Node<T> curr){
+    Node<T> node = list.head;
+    while(node.key < pred.key){
+      node = node.next;
+    }
+    return node==pred && node.next == curr;
+  }
+ \end{lstlisting}
+
+ Warum wird validate benötigt?
+ %Grafik fehlt
+ 
+ \subsection{Implementation mit Fauler Synchronisation}
+ 
+ Löschen:
+ \begin{lstlisting}
+  public static void remove(LazyList<T> list, T item){
+    int key = hash(item);
+    Node<T> pred,curr;
+    pred = list.head;
+    curr = pred.next;
+    while(curr.key < key){
+      pred = curr;
+      curr = curr.next;
+    }
+    try{
+      pred.lock();
+      curr.lock();
+      if(validate(list,pred,curr)){
+	if(curr.key == key){
+	curr.marked=true; //neues Attribut vom Typ boolean
+	pred.next = curr.next;
+      } else {
+	remove(list,item);
+      }
+    } finally {
+      pred.unlock();
+      curr.unlock();
+    }
+  }
+  
+  private static boolean validate(LazyList<T> list, Node<T> pred, Node<T> curr){
+    return !pred.marked && !curr.marked && pred.next == curr;
+  }
+  
+  public static boolean contains(LazyList<T> list, T item){
+    int key = hash(item);
+    Node<T> curr = list.head;
+    while(curr.key < key){
+      curr = curr.next;
+    }
+    return curr.key == key && !curr.marked;
+  }
+  
+ \end{lstlisting}
+
+
+\section{Implementierung}
+Zwischenspeicher, volatile, atomare Maschinenbefehle, compareAndSet, Konsenszahlen
+
+\subsection{Atomare Maschinenbefehle}
+
+Wie werden Sperren implementiert? Naiver Versuch:
+\begin{lstlisting}
+  Prozedur belegen(l):
+    solange not(l.frei) wiederhole{
+      warte einen Augenblick;
+    }
+    l.frei := false;
+\end{lstlisting}
+
+Beispielablauf:\\
+Zwei Threads $p_1,p_2$ rufen belegen(l) auf.\\
+Sei l.frei = true\\
+\begin{tabular}{c c|c}
+  $p_1$ & $p_2$ & l.frei\\
+\hline
+ 1 & & \\
+ & 1 & \\
+ 3 & & \\
+ & 3 & \\
+ 
+\end{tabular}
+
+Beide Threads sind im kritischen Bereich! 1 und 3 müssen selber einen kritischen Bereich bilden.\\
+Man benötigt einen speziellen Maschinenbefehl, z.B.
+\begin{lstlisting}
+getAndSet(l,b,v):
+  b:=l;
+  l:=v;
+\end{lstlisting}
+
+Zwei Ausführungen dieses Maschinenbefehls müssen immer unter gegenseitigem Ausschluss stattfinden, d.h. der Maschinenbefehl muss atomar sein. Die Hardware muss dafür sorgen ("` Arbitrierung"')\\
+
+\begin{lstlisting}
+Implementierung von belegen(l):
+  boolean b;
+  getAndSet(l.frei,b,false);
+ 
+  solange not(b) wiederhole{
+    warte einen Augenblick;
+    getAndSet(l.frei,b,false);
+  }
+  
+Prozedur freigeben(l):
+  boolean b;
+  getAndSet(l.frei,b,true);
+  
+\end{lstlisting}
+
+Andere atomare Maschinenbefehle:
+\quad getAndIncrement\\
+\quad getAndDecrement\\
+
+\begin{lstlisting}
+compareAndSet(l,e,v,b):
+  b:=Wahrheitswert von l=e
+  Falls b dann
+    l:=v
+    
+Prozedur belegen(l):
+  boolean b:
+  compareAndSet(l.frei,true,false,b);
+  solange not(b) wiederhole:
+    Warte einen Augenblick:
+    compareAndSet(l.frei,true,false,b);
+   
+Prozedur freigeben(l):
+  boolean b;
+  compareAndSet(l.frei,false,true,b);
+ 
+\end{lstlisting}
+
+"`volatile"' bedeutet: Lese- und Schreibzugriffe auf die Variable sind zueinander atomar: "`atomares Register"'\\
+Beispiel: volatile int x;
+
+\subsection{Konsenszahlen}
+
+Konsens-Problem:\\
+Gegeben n Threads.
+\begin{enumerate}
+ \item Jeder Thread ruft einmal auf:\\
+ entscheide(c,v,a) mit\\
+ c - gemeinsame Datenstruktur\\
+ v - Vorschlag\\
+ a - Ergebnisvariable
+ \item Der Prozeduraufruf gibt in a einen Wert zurück mit den Eigenschaften:
+ \begin{description}
+  \item[Einigkeit:] alle Threads bekommen denselben Wert
+  \item[Gültigkeit:] der Wert wurde von mindestens einem Thread vorgeschlagen
+ \end{description}
+
+\end{enumerate}
+
+Bem.: Einigkeit unf Gültigkeit sind Sicherheitseigenschaften.\\
+Es gilt:
+\begin{itemize}
+ \item Mit dem n-Konsens-Problem löst man auch das k-Konsens-Problem für beliebige $k<n$
+ \item das 1-Konsens-Problem ist trivial lösbar: a:=v.
+\end{itemize}
+
+Die Konsenszahl für eine Klasse K ist definiert als\\
+$\left\{\begin{array}{l}
+         \infty \text{ , falls K das n-Konsens-Problem für alle } n\in\mathbb{N} \text{ löst}\\
+         \sup\{n\in\mathbb{N}| K \text{ löst das n-Konsens-Problem}\}
+        \end{array}\right.
+$
+
+Satz(Herliky 1991):
+\begin{enumerate}[(a)]
+ \item Mit atomaren Registern hat man Konsenszahl 1.
+ \item Mit Warteschlange hat man Konsenszahl 2.
+ \item Mit Common2-Operationen  hat man Konsenszahl 2.\\
+ (kommutieren oder absorbieren einander)
+ \item Mit compareAndSet hat man Konsenszahl $\infty$.
+ \end{enumerate}
+ 
+Implementierung von entscheide mit compareAndSet und get:\\
+(Einfacher Konsens: jeder schlägt sich selber vor)
+\begin{lstlisting}
+entscheide(c,v,a):
+  boolean b;
+  compareAndSet(c,-1,v,b);
+  Falls b dann:
+    a:=v;
+  Sonst:
+    a:=get(c);
+    
+  /*Genauso gut: a:=get(c);*/
+\end{lstlisting}
+
+Zwischenspeicher (engl. cache, ZSP):= schneller, kleiner Speicher auf Prozessorchip\\
+Bemerkung: Herkunft des Begriffs cache = Versteck der Beute des Einbrechers\\
+Statt vom Arbeitsspeicher(ASP) zu lesen, liest der Prozessor von seinem ZSP, falls der Wert dort vorrätig ist. Statt auf den ASP zu schreiben, schreibt der Prozess auf seinen ZSP. 
+
+\paragraph{MESI-Protokoll}\quad\\
+Jeder \underline{Speicherzeile} (engl. cache line) hat einen Modus:
+\begin{itemize}
+ \item Modified:\\
+ Die Zeile wurde durch den Prozessor verändert. Kein anderer Prozessor hat diese Zeile in seinem Zwischenspeicher
+ \item Exclusive:\\
+ Die Zeile ist unverändert. Kein anderer Prozessor hat diese Zeile in seinem Zwischenspeicher
+ \item Shared:\\
+ Die Zeile ist unverändert. Andere Prozessoren können die Zeile in ihrem Zwischenspeicher haben.
+ \item Invalid:\\
+ Die Zeile enthält keine verwendbaren Daten.
+\end{itemize}
+
+Beispiel:\\
+%Grafik fehlt
+
+A liest von Arbeitsspeicher den Wert a\\
+
+%Grafik fehlt
+
+B liest; A antwortet mit a\\
+
+%Grafik fehlt
+
+B schreibt b und informiert alle darüber\\
+
+%Grafik
+
+A liest; das führt zu einer Anfrage an alle Prozessoren. B sendet b an A und an den Arbeitsspeicher\\
+
+Zweck des Protokolls: Für Kohärenz sorgen.\\
+False Sharing:=\\
+gemeinsame Speicherzeile, obwohl sich die Daten nicht überlappen.\\
+False Sharing führt unnötig häufig zum Modus Invalid.\\
+Daten, die nebeneinander verwendet werden, sollen in verschiedenen Speicherzeilen liegen.\\
+Verhalten mit getAndSet:
+\begin{enumerate}
+ \item Fall: l = false, Aufruf getAndSet(l,b,false)
+ \\%Grafik fehlt
+ Aufruf B getAndSet(l,b,false)
+ \\%Grafik fehlt
+ Aufruf C getAndSet(l,b,false)
+ \\%Grafik fehlt
+ Aufruf A getAndSet(l,b,false)\\
+ Wiederholte Aufrufe von getAndSet(l,b,false) könnne auf dem Prozessor abgearbeitet werden und belasten den Bus nicht: "'local spinning"'.
+\end{enumerate}
+
+\subsection{Bäckerei-Algorithmus}
+
+Motivation: Jeder, der in den USA in eine Bäckerei kommt, zieht zuerst eine laufende Nummer. Der Kunde mit der niedrigsten Nummer wird als nächster bedient.
+
+\paragraph{Bäckerei-Algorithmus} (engl. bakery algorithm, Leslie Lamport 1974):\\
+\begin{lstlisting}
+  Typ threadID= 0...n-1;
+  volatile flag: bool[ThreadID];
+  volatile label: long[ThreadID]; //long:Ueberlauf ausschließen
+  
+  Prozedur belegen(l):
+    int i:=pid; //pid=nummer des aufrufenden Threads
+    flag[i]:=true;
+    label[i]:=max{label[0],...,label[n-1]}+1
+    warte solange
+      exists(k)!=i:flag[k]&(label[k],k)<_{lex}(label[i],i)
+      
+  Prozedur freigeben(l);
+    flag[pid] := false;
+\end{lstlisting}
+
+Behauptung: Der Bäckereialgorithmus ist verklemmungsfrei.\\
+Beweisskizze: Der Thread i mit dem kleinsten (label[i],i) wartet nicht. Es gibt so ein i, denn $<_{lex}$ ist eine Wohlordnung, d.h. total und fundiert.\\
+
+First come, first serve(FCFS):= Wer zuerst kommt, wird zuerst bedient (Sicherheitseigenschaft). Eigentlich: Niemand wird überholt (etwas schlechtes wird nicht geschehen)\\
+FCFS ist nicht ideal implementierbar, denn zwei sehr schnell aufeinander folgendde Ereignisse sind zeitlich nicht mehr auflösbar.\\
+Kompromiss: Wer mindestens um $\Delta$ früher kommt, wird früher bedient - garantierte zeitliche Auflösung.\\
+Wenn zwei Ereignisse innerhalb von $\Delta$ aufeinander folgen, dürfen sie in beliebiger Reihenfolge bedient werden.\\
+Alternative (ohne Bezug zu Zeiten): Wer ein gewissen Programmfragment (den Torweg, engl. doorway) früher ausführt, wird als erster bedient:
+
+$$D_i^m\to D_j^n \Leftarrow \underbrace{CS_i^m \to CS_j^n}_{\text{bedeutet }fr_i^m\to bel_j^n}$$ 
+CS: critical section, kritischer Bereich\\
+$CS_j = bel_i fr_i$\\
+
+Behauptung: Bäckerei-Algorithmus ist FCFS\\
+Beweisskizze: Falls Thread i den Torweg verlässt, bevor Thread j ihn betritt, dann gilt:\\
+ flag[i] := true;\\
+ label[i] := max \{label[0],...,label[n-1]\}+1;\\
+ $w_i$(label[i],v)$\to r_j$(label[i],v)\\
+ $\to w_j$(label[i],$v'$)$\to$ Thread j verlässt Torweg\\
+ $\to r_j$(flag[i], true)\\
+ mit $v<v'$\\
+ Es gilt flag[i] und (label[i],i)$<_{lex}$(label[j],j)\\
+ Also wartet Thread j wegen Thread i.\\
+ Folgerung: Der Bäckerei-Algorithmus ist fair, denn es gilt:\\
+ Aus Verklemmungsfreiheit und FCFS (Sicherheitseigenschaft) folgt Fairness (Liveness-Eigenschaft).\\
+ Behauptung: Der Bäckerei-Algorithmus erfüllt gegenseitigen Ausschluss.\\
+ Beweisskizze: Durch Widerspruch. Angenommen, Thread i und j sind nebeneinander im kritischen Bereich und oBdA gilt $\text{(label[j],j)}<_{lex}\text{(label[i],i)}$\\
+ Die Werte von i,j sind fest. Der Wert von label[j] ändert sich niht mehr bis zum Betreten des kritischen Bereichs. Der Wert von label[i] kann höchstens größer werden. Also (label[j],j)$\not<$(label[i],i). Also flag[i] = false (aus sicht von Thread j)\\
+ Also gilt:\\ 
+ $r_j$(label[i],\_)$\to w_j$(label[j],\_)$\to$\\
+  $r_j$(flag[i],false)$\to w_i$(flag[i],true)$\to$\\
+   $r_i$(label[j],\_)$\to w_i$(label[i],\_)\\
+ 
+ Also  label[j]<label[i] $\to$ Widerspruch. q.e.d.\\
+ Nachteil: Falls nur atomare Lese- und Schreiboperationen zur Verfügung stehen, sind für n Threads Lese- und Schreibzugriffe auf n Speicherzellen nötig. Grund: Jeder Thread benötigt eine Speicherstelle, auf die er schreiben kann. Sonst kann ein Thread das überschreiben, was ein anderer geschrieben hat.\\
+ Es muss mindestens n+1 unterscheidbare Zustände geben:
+ \begin{enumerate}
+  \item Kein Thread befindet sich im kritischen Bereich
+  \item Thread i befindet sich im kritischen Bereich
+ \end{enumerate}
+
+\section{Transactional Memory}
+Ab hier nicht mehr Prüfungsrelevant
+\subsection{Probleme mit Sperren}
+
+\begin{itemize}
+ \item Prioritäts-Inversion: Thread mit niedrigerer Priorität in Inhaber einer Sperre, auf die Thread mit hoher Priorität wartet.
+ \item Convoying: Thread, der die Sperre besitzt, wartet gerade auf ein Ereignis. Andere Threads warten auf die Sperre. (Analogie: Kolonne von PKW hinter LKW)
+ \item Verklemmung, wenn Sperren in verschiedener Reihenfolge erwartet werden
+ \item Sperren sind gemeinsamen Variablen zugeordnet. Einhaltung dieser Zuordnung wird vom Compiler nicht überprüft.
+\end{itemize}
+
+\subsection{Transaktionen}
+
+Transaktion:= endliche Folge von Aktionen, die unteilbar ausgeführt wird\\
+Begriff Transaktion ist ähnlich zu kritischer Bereich\\
+Unterschiede:
+\begin{itemize}
+ \item Transaktion ist atomar zu allen anderen Transaktionen
+ \item Verklemmungen sind ausgeschlossen
+\end{itemize}
+
+Implementierungskonzept für Transaktionen:
+\begin{itemize}
+ \item Änderungen am gemeinsamen Objekt werden provisorisch ausgeführt
+ \item Wenn die Transaktionen ohne Synchronisationskonflikte gelingt, wird die Transaktion \underline{festgeschrieben} (engl.: commit), d.h. die provisorischen Änderungen werden dauerhaft gemacht. Sonst wird die Transaktion abgebrochen (engl. abort, auch: rollback)
+\end{itemize}
+
+Transactional Memory (TM):= System mit dem man Transaktionen verwalten kann\\
+Hardware TM, Software TM\\
+Vorschlag für Sprachkonstrukte:
+\begin{lstlisting}
+ atomar{	Das Programmfragment P
+  P		wird als Transaktion
+ }		ausgefuehrt
+\end{lstlisting}
+
+Transaktionen dürfen auch geschachtelt sein, d.h. P darf selber Transaktionen enthalten.\\
+\begin{lstlisting}
+ erneut; 	(engl. retry)
+\end{lstlisting}
+umgebende Transaktion wird abgebrochen, in den Wartezustand versetzt, bis sich der Objektzustand ändert, und dann neu gestartet.
+
+\subsection{Software Transactional Memory}
+\subsubsection{Transaktions-Status}
+Status := Aufzählungstyp mit den Werten ABORTED, ACTIVE, COMMITTED\\
+Transaction := Klasse mit Attribut status vom Typ AtomicReference<Status>\\
+Konstruktor, der eine Transaktion mit status = ACTIVE erzeugt.\\
+Prozeduren
+\begin{lstlisting}
+ getStatus(tr):
+  status atomar lesen(mit get)
+ commit(tr):
+  Status atomar von ACTIVE auf COMMITTED ändern (mit compareAndSet)
+ abort(tr):
+  status atomar von ACTIVE auf ABORTED ändern
+\end{lstlisting}
+
+\subsubsection{Transactional Thread}
+
+Transactional Thread erweitert Klasse java.lang.Thread;\\
+definiert globale Variable
+\begin{lstlisting}
+  onAbort, onCommit vom Typ Runnable
+  onValidate vom Typ Callable<Boolean>
+\end{lstlisting}
+
+Ausführung des Programmfragments xaction als Transaktion:
+\begin{lstlisting}
+ public static T doit(Callback<T> xaction) throws Exception{
+  T result = null;
+  boolean success = false;
+  while(!success){
+    success = true;
+    Transaction tr = new Transaction(); //Mit Status ACTIVE
+    try{
+      result = xaction.call();	//Programmfragment ausfuehren 
+				//(Lese-und Schreibzugriffe sind ersetzt
+ 				//worden durch spezielle Konstrukte
+    } catch(AbortedException e){
+      success = false;
+    } catch(Exception e){
+      throw new PanicException(e);
+    }
+    success = success && onValidate.call();
+    success = success && commit(tr);
+    /falls success = true, dann
+    //tr.status = COMMITTED
+    if(success){
+      onCommit.run();
+    } else {
+      abort(tr);
+      //tr.status = ABORTED
+      onAbort.run();
+    }
+  } //while
+  return result
+ }
+\end{lstlisting}
+
+\subsubsection{Atmomare Objekte}
+
+Atomares Objekt := gemeinsames Objekt mit Daten zur Verwaltung in Transaktionen\\
+Implementierung "`FreeObj"':\\
+Locator := Klasse mit Attributen\\
+\quad owner: letzte Transaktion, die Zugriff auf das Objekt hatte\\
+\quad old: Version des Objekts vor dem Zugriff der Transaktion\\
+\quad new: Version des Objekts, auf die die Transaktion zugreift.\\
+Bedeutung des Locators:\\
+Falls owner.status = COMMITTED, dann ist new die aktuelle Version.
+Falls owner.status = ABORTED, dann ist old die aktuelle Version.
+Falls owner.status = ACTIVE, dann gibt es keine aktuelle Version.\\
+Zugriffsversuch liefert einen Konflikt.\\
+FreeObj:=Klasse mit Attribut
+\begin{lstlisting}
+ start vom Typ AtomicReference<Locator>
+\end{lstlisting}
+Provisorischer Schreibzugriff der Transaktion auf das FreeObj f:
+\begin{lstlisting}
+ T ref = null;
+ openWrite(f,tr,ref) //ref: Version, auf die geschrieben wird
+ ...eigentlicher Schreibzugriff auf ref
+ validate(f,tr);
+ \end{lstlisting}
+
+ validate(f) stellt fest, ob tr.status = ABORTED ist und löst in dem Fall eine AbortedException aus.\\
+
+ \begin{lstlisting}
+  openWrite(FreeObj f, Transaction tr, T ref) throws Exception{
+    Status st = getStatus(tr);
+    if(st == ABORTED){
+      throw new AbortedException();
+    } else if(st == COMMITTED){
+      throw new PanicException();
+    } else {
+      //st == ACTIVE
+      Locator oldloc = f.start.get();
+      Transaction owner = oldloc.owner;
+      if(owner==tr){
+	ref = oldloc.new;
+      } else {
+	abort(owner);
+	//falls owner.status = ACTIVE;
+	//dann ändern zu ABORTED
+	//Konfliktloesung: Rivalen beseitigen
+	Status ost = getStatus(owner);
+	Locator newloc = new Locator();
+	if(ost==COMMITTED){
+	  newloc.old = oldloc.new;
+	} else {
+	  //ost == ABORTED
+	  newloc.old = oldloc.old;
+	  ...newloc.old auf newloc.new kopieren
+	  boolean success = f.start.compareAndSet(oldloc,newloc);
+	  if(success){
+	    ref = newloc.new;
+	  } else {
+	    abort(tr);
+	    throw new AbortedException();
+	  }
+	}
+      }
+    }
+ \end{lstlisting}
+
+
+\section{Prüfungsvorbereitung}
+
+\subsection{KW56}
+ \paragraph{Aufgabe 1:}\quad\\
+ Für die 2. Version des Erzeuger-Verbraucher-Problems (1 Erzeugerthread, 1 Verbraucherthread, 1 Puffer für $N>0$ Datenblöcke) seien die Zugriffsproz. auf den gemeinsamen Puffer folgendermaßen definiert:\\
+ einreihen(puffer,datenblock):\\
+ \{I\}
+ \begin{enumerate}
+  \item belegen(nichtvoll);
+  \item stock(puffer,datenblock);
+  \item freigeben(nichtleer);
+ \end{enumerate}
+  \{I\}\\
+  \\
+  abholen(puffer,datenblock):\\
+  \{I\}
+  \begin{enumerate}[(a)]
+   \item belegen(nichtleer);
+   \item datenblock::top(puffer);
+   \item pop(puffer);
+   \item freigeben(nichtvoll);
+  \end{enumerate}
+  \{I\}\\
+  Die Bedingung I an einen Zustand sei definiert durch:
+  $$I:\Leftrightarrow0\leq\text{nichtvoll}\leq N \wedge \text{nichtleer}=N-\text{nichtvoll} $$
+  Es darf vorausgesetzt werden, dass I beim Start der beiden Threads gilt.
+  \begin{enumerate}[a)]
+   \item Beweisen sie, dass \{I\} einreihen(puffer,datenblock)\{I\} und \{I\}abholen(puffer,datenblock)\{I\} gelten. (sequentieller Fall)
+   \item Geben sie einen Ablauf an, bei dem der Beweis von Teilaufgabe a) nicht mehr anwendbar ist. (Nebenläufiger Fall)
+  \end{enumerate}
+  Hinweis: belegen(v) wartet bis $v>0$ und verringert v dann um 1. freigeben(v) erhöht v um 1.\\
+  \\
+  Lösung: a)\\
+  \begin{itemize}
+   \item Nach belegen(nichtvoll) (1) gilt:
+   $$I':\Leftrightarrow1\leq\text{nichtvoll}+1\leq N \wedge \text{nichtleer}=N-\underbrace{(\text{nichtvoll}+1)}_{\text{Alter Wert von nichtvoll}} $$
+   \item stock(puffer,datenblock) ändert I' nicht
+   \item Nach freigeben(nichtleer) (3) gilt:
+   $$0\leq\text{nichtvoll}\leq N-1 \wedge \underbrace{\text{nichtleer}-1}_{\text{alter Wert von nichtleer}}=N-1-\text{nichtvoll}$$
+   Daraus folgt I
+  \end{itemize}
+  2. Teil
+  \begin{itemize}
+   \item Vor Aufruf von abholen(puffer,datenblock) gelte I. Nach Ausführung von belegen(nichtleer) gilt:
+   $$0\leq\text{nichtvoll}\leq N\wedge1+\text{nichtleer}\neq\emptyset\wedge\text{nichtleer}+1=N-\text{nichtvoll} $$
+  \end{itemize}
+  Daraus folgt I', denn nichtleer+1$\neq\emptyset$ bedeutet dass nichtvoll$\neq N'$ (sonst wäre N-nichtvoll=0).\\
+  Nach freigeben(nichtvoll) gilt: 
+  $$0\leq \text{nichtvoll}-1\leq N-1\wedge \text{nichtleer}=N-1-(\text{nichtvoll}-1)$$
+  Daraus folgt I. q.e.d.\\
+  \\
+  b)\\
+  Ablauf:\hspace{5cm} Am Anfang gelte I\\
+  \begin{tabular}{c|c}
+  Erzeuger	&	Verbraucher \\\hline
+   (1) 	& 	$\leftarrow$ hier gilt I', I gilt nicht - q.e.d.\\
+	&	(a) \\
+    (2)	&	\\
+	&	(b)\\
+	&	(c)\\
+    (3)	&	\\
+	&	(d)
+  \end{tabular}
+
+  \paragraph{Aufgabe 2}\quad\\
+  Welche der folgenden Eigenschaften sind Sicherheitseigenschaften, welche sind Liveness-Eigenschaften? (je 1 Punkt)
+  \begin{enumerate}[a)]
+   \item Auf jede Anfrage folgt eine Antwort
+   \item Syntaktisch flasche Angaben führen nicht zu einer Zustandsänderung
+   \item Wenn das Programm auf die Eingabe x einen Wert y ausgibt, dann gilt $y^2=x$
+   \item Wenn die Mindestgeschwindigkeit eines Flugzeugs unterschritten wird, wird die Schubkraft erhöht
+  \end{enumerate}
+  \quad\\
+  Lösung:\hspace{5cm}  Typische Wörter (einsetzbar):
+  \begin{enumerate}[a)]
+   \item Liveness-Eigenschaft\hspace{2.2cm}  "`schließlich"' - Zukunft wichtig, Reaktion
+   \item Sicherheits-Eigenschaft\hspace{2cm}"`niemals"',"`Verbot"'
+   \item Sicherheits-Eigenschaft\hspace{2cm}Verbot von $y^2\neq x$
+   \item Liveness-Eigenschaft\hspace{2.4cm}Versprechen für Zukunft
+  \end{enumerate}
+  
+ \paragraph{Aufgabe 3:}\quad\\
+ Das Programmfragment P soll als bedingter kritischer Bereich mit Bedingung B ausgeführt werden.
+ \begin{enumerate}[a)]
+  \item Geben sie in Pseudocode eine Implementierung mit Sperren an
+  \item Begründen sie im Fall zweier Threads, dass folgende Eigenschaften gelten:
+  \begin{enumerate}[(1)]
+   \item zu jeden Zeitpunkt befindet sich höchstens 1 Thread im bedingten kritischen Bereich
+   \item Beim Betreten des kritschen Bereichs gilt B.
+   \item Wenn B nicht gilt, wird die Sperre wieder freigegeben
+  \end{enumerate}
+  Die garantierten Eigenschaften von Sperren dürfen dazu vorausgesetzt werden.
+ \end{enumerate}
+ \quad\\
+ Lösung: a)
+ \begin{lstlisting}
+  lock(x);
+  solange not(B) wiederhole:  	//<--beginn kritischer Bereich
+    unlock(x);
+    warte ein Weilchen;
+    lock(x);
+  P;				//<--Ende kritischer Bereich
+  unlock(x);
+ \end{lstlisting}
+  \quad\\
+ b)
+ \begin{enumerate}[(1)]
+  \item  Wenn ein Thread im kritischen Bereich, dann hat er die Sperre x, und ein anderer Thread kann diese Sperre nicht auch haben.
+  \item Als Voraussetzung gilt: B kann nur im kritischen Bereich geändert werden.\\
+    B wurde überprüft, während Thread die Sperre x besitzt.\\
+    B kann sich also bis zum Betreten des kritischen Bereichs nicht ändern.
+  \item nach "`not(B) wiederhole"' wird unlock(x) ausgeführt
+ \end{enumerate}
+
+\subsection{KW57}
+\paragraph{Bemerkungen zu "`belegen"' und "`freigeben"':}\quad\\
+Bei Sperren: Sperren l hat Attribut frei vom typ boolean.\\
+belegen(l): Warten solange l.frei=false. l.frei auf false setzen.\\
+freigeben(l): l.frei auf true setzen.\\
+Bei Semaphoren: l.frei hat Typ int.\\
+belegen(l): Warten solange l.frei=0. l.frei um Eins verringern.
+freigeben(l): l.frei um Eins erhöhen.
+
+\paragraph{Aufgabe 4}\quad\\
+Gegeben sei folgende elementare Ereignisstruktur:
+%Illustration Ereignisstruktur
+\begin{enumerate}[(a)]
+ \item Welche der folgenden Abläufe sind damit möglich? (Je 1 Punkt)
+ \begin{enumerate}
+  \item a b c d e f g h i  - i.O.
+  \item a c e b u d f h g  - i.O.
+  \item b f c a d h \underline{g e} i  - nicht in Ordnung, da g vor e
+  \item b a \underline{e c} d u f h g  - nicht in Ordnung, da e vor c
+ \end{enumerate}
+ \item Welche der Schnitte $s_1$,$s_2$ sind in einem System möglich, d.h. entsprechen einem Zustand, den das System einnehmen kann? (4 Punkte)\\
+ %Bild Ereignisstruktur mit Schnitten s1, s2
+  $s_1$ unmöglich, denn e ist in Vergangenheit und a in Zukunft, aber $a\to e$ soll gelten.\\
+ $s-2$ möglich.
+ \end{enumerate}
+ \paragraph{Aufgabe 5:}\quad\\
+ Ein System habe die Aktionenmenge $A=A_i\cup A_2$, wobei $A_i:=\{ant_i,bel_i,fr_i\}$ für $i\in\{1,2\}$. Angenommen, jeder Zustand y des Systems erfüllt folgende Eigenschaften:
+ \begin{enumerate}
+  \item $0\leq\#_y ant_i-\#_y bel_i \leq 1$
+  \item $0\leq\#_y bel_i-\#_y fr_i \leq 1$
+  \item $0\leq\#_y ant_i-\#_y fr_i \leq 1$
+ \end{enumerate}
+ \begin{enumerate}[(a)]
+  \item Zeigen sie, dass für die Menge S der endlichen seriellen Abläufe des Systems gilt: (6 Punkte)\\
+  $\pi_{A_i}(S)=(ant_i,bel_i,fr_i)^* (\epsilon+ant_i+ant_i bel_i)$\\
+  Hinweis: Konstruieren sie einen Zustandsautomaten über dem Alphabet $A_i$, der alle endlichen seriellen Abläufe akzeptiert, die die Eigenschaften $\alpha,\beta,\gamma$ erfüllen.\\
+  Lösung:\\ %Siehe Skizze
+  Andere Zustandsübergänge sind nicht möglich, denn
+  $000\underset{bel_i}{\to}(-1)10, \alpha$ verletzt\\
+  $000\underset{fr_i}{\to}1-(1)(-1), \beta,\gamma$ verletzt\\
+  $101\underset{ant_i}{\to}202, \alpha,\gamma$ verletzt\\
+  $101\underset{fr_i}{\to}1(-1)0, \beta$ verletzt\\
+  $011\underset{ant_i}{\to}112, \gamma$ verletzt\\
+  $011\underset{bel_i}{\to}(-1)21, \alpha,\beta$ verletzt\\
+  
+  \item Die Aktionen mögen folgende Bedeutung haben:\\
+  $ant_i$: Thread i beantragt den Zugriff\\
+  $bel_i$: Thread i erhält den Zugriff\\
+  $fr_i$: Thread i gibt den Zugriff frei\\
+  Geben sie damit an:
+  \begin{enumerate}
+   \item einen Ausdruck dafür, wie oft Thread i den Zugriff in Zustand y bereits freigegeben hat (1 Punkt) - $\#_y fr_i$
+   \item einen Ausdruck für die Zugriffe im Zustand y (1 Punkt) - $\#_y BEL - \#_y FR$
+   \item eine Formel für die Aussage: "`Thread i hat den Zugriff beantragt, aber noch nicht erhalten"' (2 Punkte) - $\#_y ant_i - \#_y bel_i \geq 1$
+   \item eine Formel für die Aussage: "`Wenn Thread i den Zugriff erhalten hat, dann gibt er den Zugriff schließlich wieder frei"' (2 Punkte) - $\#_x bel_i - \#_y fr_i = 0\quad \forall x\exists y:x\leq_{pre}y$
+  \end{enumerate}
+
+ \end{enumerate}
+
+
+\section{Datenflußnetze}
+Merge, Bitonic, map/reduce, Beispiel: parallel prefix
+
+
+\section{Übungen}
+\subsection{KW 45}
+\begin{enumerate}
+ \item Beweisen sie, dass für alle Threads $p_1,p_2$ folgende Aussagen äquivalent sind:
+ \begin{enumerate}[(a)]
+  \item $\pi_{\alpha(p_1)\cap\alpha(p_2)}(E_1\cup E_2) = E_1 \cap E_2 $
+  \item  $\pi_{\alpha(p_1)\cap\alpha(p_2)}(E_1\oplus E_2) = \emptyset$
+  \item  $\pi_{\alpha(p_1)}(E_2) =\pi_{\alpha(p_2)}(E_1)$
+ \end{enumerate}
+ 
+ Lösung:\\
+ $E_1\oplus E_2 = E_1 \cup E_2 \setminus E_1\cap E_2$\\
+ $a) \Leftrightarrow b)$\\
+ $\pi_{\alpha(p_1)\cap\alpha(p_2)}((E_1\oplus E_2) \cap (E_1\cap E_2)) = E_1 \cap E_2$\\
+ $\pi_{\alpha(p_1)\cap\alpha(p_2)}((E_1\oplus E_2))\cup \pi_{\alpha(p_1)\cap\alpha(p_2)}((E_1\cap E_2)) = E_1 \cap E_2$\\
+ $\pi_{\alpha(p_1)\cap\alpha(p_2)}((E_1\cap E_2)) = E_1 \cap E_2$\\
+ $\pi_{\alpha(p_1)}(\pi_{\alpha(p_2)}(E_1\cap E_2)) = E_1 \cap E_2 $\\
+ $E_1 \cap E_2 = E_1 \cap E_2$\\
+ \\
+ $b) \Leftrightarrow a)$\\
+ $\pi_{\alpha(p_1)\cap\alpha(p_2)}(E_1\cup E_2 \setminus E_1\cap E_2) = \pi(E_1\cup E_2) \setminus \pi(E_1\cap E_2) = E_1 \cap E_2 \setminus E_1 \cap E_2 = \emptyset$\\
+ \\
+ $c) \Leftrightarrow a)$\\
+ 
+ 
+\end{enumerate}
+
+\subsection{KW 46}
+
+\begin{enumerate}
+ \item Drücken sie als logische Formel aus:
+    \begin{enumerate}[(a)]
+	\item Verklemmungsfreiheit:\\
+	Wenn ein Thread die Sperre erwerben möchte, dann gibt es einen Thread, der die Sperre bekommt
+	\item Im Zustand y befindet sich der Thread i im kritischen Bereich
+	\item Jeder Thread, der eine Sperre erwirbt, gibt sie wieder her 
+	\item Im Zustand y hat Thread i die Sperre beantragt, aber noch nicht erhalten
+     \end{enumerate}
+
+     Lösung:
+     \begin{enumerate}[(a)]
+      \item\quad\\
+      $\forall y:E$ $ant_i \Rightarrow \lozenge bel_k$\quad$i,k\in\mathbb{N}$\\
+      $\forall i \in \mathbb{N}: \forall y \leq_{pre} x: y(\#_y)ant_i \Rightarrow \exists z,k:y\leq_{pre}z\leq_{pre}x$\quad$y=(x|x\in A)$
+     
+     \item $\#_y < \infty \wedge \#_y bel_i > \#_y fr_i$\\
+     $\#_ybel_i-\#_yfr_i > 0$
+     
+     \item $\forall i\in \mathbb{N}: \forall y \leq_{pre} x:\#_y<\infty \wedge \#_y bel_i - \#_y fr_i > 0 \Rightarrow$\\$\exists z_i: y\leq_{pre} z \leq_{pre} x \wedge \#_z bel_i - \#_z fr_i = 0$
+     
+     \item $\#_y ant_i = \#_y bel_i +1 $
+     \end{enumerate}
+
+\end{enumerate}
+
+
+\subsection{KW 48}
+
+Aufgabe:\\
+In der verketteten Liste sei die Menge $\{1,5,8\}$ gespeichert. Zwei Threads wollen Elemente $6,7$ eintragen. Skizzieren sie den Ablauf.
+
+%Grafik fehlt
+$$-\infty\rightarrow1\rightarrow5\rightarrow8\rightarrow\infty$$
+\begin{enumerate}
+ \item 	I schneller: add(6)\\
+	II schneller: add(7)
+ \item II schneller\\
+	I schneller
+\end{enumerate}
+
+Aufgabe:\\
+Entwerfen sie eine Prozedur zum Entfernen eines Elements.\\
+\begin{lstlisting}
+ if(curr.key>=key){
+    pred.next = curr.next;
+ }
+\end{lstlisting}
+
+Aufgabe:\\
+In der verketteten Liste $\{1,5,6,7,8\}$ will Thread 1 das Element 6 löschen und Thread 2 das Element 7. Skizzieren sie den Ablauf.
+%Grafik fehlt
+$$-\infty\rightarrow1\rightarrow5\rightarrow6\rightarrow7\rightarrow8\rightarrow\infty $$
+
+Aufgabe:\\
+In der verketteten Liste $\{1,5,6,8\}$ will Thread 1 das Element 7 einfügen, Thread 2 das Element 6 löschen. Skizzieren sie den Ablauf.
+%Grafik fehlt
+\\
+Aufgabe:\\
+In der verketteten Liste $\{1,5,7,8\}$ will Thread 1 das Element 7 löschen, Thread 2 das Element 6 einfügen, Skizzieren sie den Ablauf.
+%Grafik fehlt
+
+\subsection{KW50}
+
+Korrektur zu Implementierung mit Optimistischer Synchronisation:
+\begin{lstlisting}
+pubic static void add(OptList<T> list, T item){
+  int key = hash(item);
+  Node pred, curr;
+  boolean weiter = true; //Änderung
+  while(weiter){ //Änderung
+    pred = list.head;
+    curr = pred.next;
+    while(curr.key <= key){
+      pred = curr;
+      curr = curr.next;
+    }
+    pred.lock();
+    curr.lock();
+    try{
+      if(validate(list,pred,curr)){
+	if(curr.key != key){
+	  Node node = new Node(item);
+	  node.next = curr;
+	  pred.next = node;
+	}
+	weiter = false; //Änderung
+      } 
+    } finally {
+      pred.unlock();
+      curr.unlock();
+    }
+  } //Änderung
+\end{lstlisting}
+
+
+
+
+\end{document}

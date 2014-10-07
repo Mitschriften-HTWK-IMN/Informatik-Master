@@ -1,0 +1,490 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{listings}
+\usepackage{float}
+\usepackage[ngerman]{babel}
+\usepackage{url}
+
+
+\title{Kryptologie - Geser}
+\author{Hans-Christian Heinz\\
+hheinz@imn.htwk-leipzig.de\\
+CC-BY-NC-SA 4.0}
+\date{WS 2012/13}
+
+\pdfinfo{%
+  /Title    (Kryptologie-Skript)
+  /Author   (Hans-Christian Heinz)
+  /Creator  ()
+  /Producer (Prof. Alfons Geser)
+  /Subject  ()
+  /Keywords ()
+}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+\section{Grundbegriffe}
+
+Zwei Begriffe für Sicherheit im Englischen:
+\begin{description}
+ \item[Safety] Sicherheit vor Unfällen (\glqq{}technische Sicherheit\grqq{})
+ \item[Security] Sicherheit vor Missbrauch (\glqq{}Zugriffssicherheit\grqq{})
+\end{description}
+
+Hier: Security.
+
+Kryptographie (griech. crypto + graphein):=Geheimschrift \\
+Zweck: Nachrichten übermitteln, wobei Vertraulichkeit und Integrität gewahrt bleiben.\\
+\begin{itemize}
+ \item Vertraulichkeit (engl. confidentiality) := kein Unbefugter kann die Nachricht verstehen
+ \item Integrität (engl. integrity) := kein Unbefugter kann die Nachricht manipulieren
+ \item Echtheit (engl. authenticity) := der Absender ist derjenige, der zu sein er behauptet
+\end{itemize}
+
+Integrität setzt Echtheit voraus: Ein falscher Absender kann eine beliebige Nachricht senden.\\
+\\
+Die Nachricht wird \underline{verschlüsselt}, d.h. in eine Form gebracht, die nur der Empfänger wieder verstehen kann. Der Empfänger kann die verschlüsselte Nachricht wieder \underline{entschlüsseln}, d.h. in lesbare Form übersetzen.\\
+\\
+Typische Anwender der Kryptographie:
+\begin{itemize}
+ \item Militär
+ \item Geheimdienste (und Verschwörer)
+ \item Industrie
+ \item Liebende
+\end{itemize}
+
+Klartext (engl. plaintext):= zu übermittelnde Nachricht\\
+Geheimtext (engl. ciphertext):= verschlüsselte Nachricht\\
+\\
+Der Klartext kann dabei eine beliebige Zeichenreihe sein.\\
+\\
+Gewünschte Eigenschaften einer Verschlüsselung:
+\begin{itemize}
+ \item Verschlüsselung und Entschlüsselung sind automatisch ausführbar
+ \item Verschlüsselung und Entschlüsselung sind leicht änderbar
+\end{itemize}
+
+Deshalb implementiert man Verschlüsselung durch eine Verschlüsselungsfunktion mit \underline{Schlüssel} als Parameter. Ebenso implementiert man die Entschlüsselungsfunktion mit Schlüssel als Parameter.\
+\\
+Kryptosystem:=zueinander passende Ver- und Entschlüsselungsfunktion.\\
+\\
+Schreibweise:
+\begin{itemize}
+ \item $V_S$ Verschlüsselung mit Schlüssel S
+ \item $E_S$ Entschlüsselung mit Schlüssel S
+\end{itemize}
+Schlüssel S für Verschlüsselung und Schlüssel S' für Entschlüsselung müssen zueinander passen, damit die Entschlüsselung gelingt:
+$$E_{S'}(V_S(K))=K$$
+
+Feste Namen für die \underline{Hauptfiguren} (engl. principals):
+\begin{itemize}
+ \item Alice = Absender
+ \item Bob = Empfänger
+ \item Charlie = Angreifer, Eindringling (engl. intruder)
+\end{itemize}
+
+Übertragungsmodell für verschlüsselte Nachrichten:\\
+\\
+\fbox{Alice}$\xrightarrow{K}$\fbox{V}$\xrightarrow{G}$\fbox{Kanal}\\
+\\
+%Grafik raussuchen
+K:= Klartext\\
+G:= Geheimtext\\
+\\
+Kerkhoffs Prinzip:= Die Algorithmen müssen öffentlich sein, nur die Schlüssel sind geheim.\\
+Gründe:
+\begin{itemize}
+ \item Die Algorithmen sollen gut untersucht werden, um mögliche Schwächen offenzulegen. Viele Fachleute sollen die Algorithmen studieren und untereinander diskutieren (Forschung, Publikation)
+ \item Algorithmen zu entwickeln, testen, installieren ist aufwändig und schwierig geheim zu halten (viele beteiligte Leute)
+\end{itemize}
+
+Kryptanalyse:= Geheimschrift-Analyse\\
+Zweck: verschlüsselte Nachrichten ohne Kenntnis des Schlüssels verstehen\\
+\glqq{} Schlüssel knacken\grqq{} \glqq{}Nachricht entziffern\grqq{}
+Kryptologie:= Kryptographie und Kryptanalyse zusammengefasst.\\
+\\
+Bemerkung: Begriff Kryptologie drückt aus, dass Kryptographen die Methoden der Kryptoanalysten kennen müssen und umgekehrt.\\
+\\
+Arbeitsfaktor:= Aufwand zum Knacken des Schlüssels\\
+\\
+Angriff:= bestimmte Methode der Kryptanalyse\\
+\\
+Grundsätzliche Situation der Kryptoanalyse:
+\begin{itemize}
+ \item exhaustive Suche (:= alle möglichen Schlüssel probieren; engl. brute force) hat exponentiellen Aufwand in der Schlüssellänge.
+ \item ausnutzbare Eigenschaften (Regelmäßigkeiten, Symmetrien) der Verschlüsselung können den Suchraum dramatisch verkleinern.
+ \item Großer Suchraum ist notwendig, aber nicht hinreichend für Vertraulichkeit.
+\end{itemize}
+
+\paragraph{Ende KW41}
+
+Mögliche Ausgangsituationen für einen Angriff:
+\begin{description}
+ \item[ciphertext-only:] Nur der Geheimtext liegt vor
+ \item[known-plaintext:] Ein Paar bestehend aus Klartext und dezu gehörigem Geheimtext liegt vor
+ \item[chosen-plaintext:] Der Angreifer kann sich einen Klartext aussuchen und bekommt den Geheimtext dazu
+\end{description}
+
+\underline{Bem.:} Nur vertrauliche Nachrichten verschlüsseln. Insbesondere keine Nachrichten verschlüsseln, die sich Charlie aus anderen Quellen leicht rekonstruieren kann, z.B. einen Wetterbericht. Solche Nachrichten liefern ihm known-plaintext.\\
+Mögliche Eingriffe des Angreifers:
+\begin{enumerate}
+ \item Geheimtext lesen und speichern
+ \item den Empfang des Geheimtextes stören
+ \item Gespeicherte Nachricht nochmal schicken (engl.: Replay)
+ \item Fingierte Geheimtexte einfügen
+ \item Geheimtext abfangen und geändert weitergeben
+ \item Sich als Bob ausgeben
+\end{enumerate}
+
+
+\section{Symmetrische Kryptosysteme}
+
+\underline{Symmetrisches Kryptosystem:} Zueinander passende Schlüssel sind gleich.\\
+Verschlüsselung und Entschlüsselung sind durch denselben Schlüssel codiert. Alice und Bob müssen den Schlüssel kennen (\glqq gemeinsamer Schlüssel\grqq).
+
+\subsection{Substitution}
+\underline{Chiffre:} Verschlüsselungsverfahren, das zeichenweise arbeitet\\
+\underline{Monoalphabetische Substitution:} Ersetzen von Zeichen durch andere Zeichen nach einer gegebenen Abbildungsvorschrift.\\
+Abbildungsvorschrift typisch durch Tabelle gegeben.\\
+Vorsicht: Hier Alphabet = Tabelle!\\
+Beispiel: Caesars Chiffre.\\
+Jeden Buchstaben durch den Buchstaben um 3 Stellen weiter im Alphabet ersetzen, also z.B. A durch D, B durch E, ... W durch Z, X durch A, Y durch B, Z durch C.\\
+\begin{table}[h]
+\centering
+\begin{tabular}{l|c c c c c c}
+Zeichen im Klartext & A & ... & W & X & Y & Z\\ \hline
+Zeichen im Geheimtext & D & ... & Z & A & B & C\\
+\end{tabular}
+\end{table}
+ Klartext: MORGENANGRIFF\\
+ Geheimtext: PRUJHQDJULII\\
+ \\
+ Entschlüsselung: Umkehrabbildung (:= Tabelle von unten nach oben lesen)\\
+ \\
+Allgemeine: beliebige Permutation des Alphabets\\
+Zur Erinnerung:\\
+Permutation = umkehrbare Abb. einer endl. Menge auf sich selber. Es gibt n! (\glqq n-Fakultät\grqq) verschiedene Permutationen auf einer Menge mit n Elementen\\
+Beispiel: Der ASCII-Zeichensatz (128 Zeichen) erlaub 128! Permutationen.
+
+Trotzdem sind Substitutionen einfach zu knacken, nämlich durch Häufigkeitsanalyse. Die Sprache des Klartexts muss dazu bekannt sein.\\
+\underline{Häufigkeitsanalyse} im Deutschen:
+\begin{enumerate}
+ \item In einem deutschen Text kommen Leerzeichen und Buchstabe e durchschnittliche mit einer Häufigkeit von je 17\% vor; danach kommt n mit 10\% vor.
+ \item Wenn der Klartext ausreichend lang ist, darf man dort etwa dieselben Häufigkeiten erwarten (\glqq Gesetz der großen Zahlen\grqq).
+ \item Charlie stellt ein Histogramm auf (:=Tabelle der Häufigkeiten). Die häufigsten Zeichen im Geheimtext sind wahrscheinlich die Verschlüsselung con Leerzeichen und e.
+\end{enumerate}
+Verfeinerung: Analyse der Häufigkeit von Paaren (\glqq{}Bigrammen\grqq) und Tripel (\glqq Trigrammen\grqq) von Buchstaben. Im Deutschen: er, en, ch, de, sch, der, ich, ein, che.\\
+Die Häufigkeitsanalyse profitiert von der Redundanz im Klartext. Die Redundanz kann praktisch eliminiert werden durch Kompression des Klartexts (z.B. mit dem Ziv/Lempel-Algorithmus: zip, gzip).
+
+\subsection{Transposition}
+\underline{Transposition:} Ersetzen der Position eines Zeichens durch eine andere Position nach einer gegebenen Abbildungsvorschrift.\\
+Die Positionsmenge ist endlich und liegt fest. Deshalb kann man nur Klartext fester Länge so verschlüsseln.\\
+Der Klartext wird dazu in Blöcke der vorgegebenen Länge L zerlegt. Die blockweise Verschlüsselung nennt man auch \underline{Blockchiffre}.\\
+Beispiel:\\
+Schlüsselbegriff: \glqq{}Basis\grqq
+\begin{table}[h]
+\centering
+\begin{tabular}{l|c c c c c c}
+Position im Klartext & 1 & 2 & 3 & 4 & 5 \\ \hline
+Position im Geheimtext & 2 & 1 & 4 & 3 & 5\\
+\end{tabular}
+\end{table}
+
+Klartext: MORGE'N ANG'RIFF '\\
+Geheimtext: OMGRE' NNAG'IRFF '\\
+\\
+Zusätzliche Maßnahme: Die Blöcke zeilenweise untereinander hinschreiben und spaltenweise auslesen (\glqq{}columnar transposistion\grqq).\\
+\\
+Hier:
+\begin{table}[h]
+\centering
+\begin{tabular}{l l l l l}
+O & M & G & R & E\\
+ & N & N & A & G\\
+I & R & F & F & 
+\end{tabular}
+\end{table}
+
+\subsection{Lineare Transformation}
+Claude Shannon führte folgende Begriffe ein:\\
+\begin{description}
+ \item[Confusion (deutsch: Verwirrung):] zwischen Geheimtext und Schlüssel muss ein möglichst komplizierter Zusammenhang bestehen.
+ \item[Diffusion (deutsch: Streuung/Durchdringung):] Das Umklappen eines Bits im Klartext (d.h. die Änderung von 0 nach 1 oder umgekehrt) muss das Umklappen jedes Bits im Geheimtext mit einer Wahrscheinlichkeit von 0.5 bewirken.
+\end{description}
+
+Confusion soll verhindern, dass Charlie aus dem Geheimtext Informtation über den Schlüssel bezieht.\\
+\\
+Intuitiv:\\
+Diffusion streut die Wirkung eines Bits soweit wie möglich. Die Verringerung des Arbeitsfaktors soll verhindert werden.\\
+Die monoalphabetische Substitution hat keine Diffusion: Das Umklappen eines Klartext-Bits wirkt sich nur auf die Bits eines Zeichens im Geheimtext aus.\\
+\\
+Zur Erinnerung:\\
+Eine Transformation f:V$\rightarrow$V auf einem Vektorraum(V,K,+,*) heißt \underline{linear}, wenn sie die Linearitätseigenschaften hat:\\
+$$f(a+b)=f(a)+f(b)$$ für alle a,b $\in$ V
+$$f(\alpha *a) = \alpha *f(a)$$ für alle a$\in$ V, $\alpha\in$ K \\
+\\
+Wenn eine Basis des Vektorraums gegeben ist, kann ein Vektor als Koordinatentupel dargestellt werden, und eine lineare Transformation kann ausgedrückt werden durch Multiplikation des Vektors mit einer Matrix.\\
+Ein Block der Länge L kann als Vektor der Dimension L aufgefasst werden. Die Zeichen sind dabei die Skalare. Verschlüsselung:
+$$G = A*K$$
+wobei A eine umkehrbare L$\times$L-Matrix ist, d.h. det(A)$\neq0$. Entschlüsselung:
+$$K = A^{-1}*G $$
+Die Matrix A ist hier der Schlüssel.\\
+\\
+Hill-Chiffre =\\
+Lineare Transformation im Vektorraum $\mathbb{Z}_{26}^L$.\\
+Geeignet entworfende lineare Transformationen haben Diffusion.\\
+Angriffsmöglichkeit:
+$L^2$ known-plaintext-Paare, d.h. L Paare von Blöcken reichen aus für ein lineares Gleichungssystem, dessen Unbekannte die $L^2$ Koeffizienten der Matrix sind.\\
+Abhilfe: Kombination der linearen Transformation mit nicht-linearen Verschlüsselungsmethoden, z.B. mit einer geeigneten Substitution.
+\underline{Bem.:} Transpositionen helfen nicht, denn jede Transposition ist als lineare Transformation darstellbar.
+
+\subsubsection{Bitweises Exklusiv-Oder}
+
+Der Klartext sei als endliche Bitfolge gegeben. Der Schlüssel muss dazu eine Bitfolge mit derselben Länge sein. Der Schlüssel wird bitweise mit dem Klartext Exklusiv-Oder (XOR) verknüpft.\\
+Beispiel:
+\begin{table}[h]
+\centering
+\begin{tabular}{l l l l l l l}
+1 & 0 & 1 & 1 & 1 & 0 & Klartext\\
+0 & 1 & 1 & 0 & 1 & 1 & Schlüssel\\\hline
+1 & 1 & 0 & 1 & 0 & 1 & Geheimtext
+\end{tabular}
+\end{table}
+
+Entschlüsselung: Geheimtext mit Schlüssel bitweise EXOR verknüpfen.\\
+Schlüsselstrom (engl.: keystream):= Schlüssel als unendliche Bitfolge.\\
+One-time-pad := zufällig generierter Einweg-Schlüssel\\
+Wenn der Schlüssel zufällig ist, d.h. seine Bits  zufallsverteilt sind, kann die Veschlüsselung nicht geknackt werden.
+Problem: die benötigte Schlüssellänge ist groß Der Schlüssel kann erbeutet werden.
+\\
+%KW45 fehlt, siehe Mail von Geser
+\\
+Die Durchführung dieser Ausschreibung gilt als vorbildlich. Gewinner war der Algorithmus Rijndael (nach den belgischen Autoren Vincent Rijmen und Joan Daemen).\\
+Offizielle AES-Spezifikation:\\
+\url{http://csrc.nist.gov/publications/fips/fips197/fips-197.pdf}\\
+Algorithmus von AES-128 in Pseudocode:
+\begin{enumerate}
+  \item Parameter:\\
+	Klartext K: Feld der Länge 16 von Bytes (16 Bytes = 128 Bits)\\
+	Schlüssel S: Feld der Länge 16 von Bytes
+  \item Variablen:\\
+	Textregister T: 2-dimensionales Feld von Bytes mit 4 Zeilen und 4 Spalten
+  \item Kopiere K spaltenweise in T
+  \item Verknüpfe T bitweise EXOR mit Rundenschlüssel S$_0$.
+  \item Wiederhole für Runde $r\in\{1,\dots,10\}$ folgendes:
+  \item (Anfang der Schleife) SubBytes: Substituiere T mit vorgegebener Substitution auf Bytes
+  \item Rotate Rows: Für jede Zeile i, rotiere die i-te Zeile zyklisch nach links, um i Stellen
+  \item MixColumns: Mische T, d.h. multipliziere jede Spalte mit einer vorgegebenen 4x4-Matrix, falls r$\neq$10
+  \item AddRoundKey: Verknüpfe T bitweise EXOR mit dem Rundenschlüssel S$_r$ (Ende der Schleife)
+  \item Ergebnis: Lese Inhalt von T spaltenweise aus
+\end{enumerate}
+
+Der Rundenschlüssel S$_r$, für $r\in\{0,1,\dots,10\}$ ist ein 2-dim. Feld von Bytes mit 4 Zeilen und 4 Spalten. Er wird aus S und r berechnet.\\
+Zur Effizienz:\\
+\glqq{}Gute Software-Implementierungen auf einem 2GHz-Prozessor erreichen 700MBit/s Verschlüsselungsrate. Das reicht um 100 MPEG-2 Videos in Echtzeit zu verschlüsseln\grqq{}(nach Tanenbaum)\\
+\\
+Mathematischer Hintergrund:
+\begin{enumerate}
+  \item	$\mathbb{Z}_2$: Restklassenring der ganzen Zahlen modulo 2.\\
+	$\mathbb{Z}_2 = \{0,1\}$. Addition = Subtraktion = EXOR.\\
+	Multiplikation = UND. $\mathbb{Z}_2$ Körper, $1^{-1}=1.$\\
+	Darstellung von 0,1 durch Bits.
+  \item	K Ring der Polynome über $\mathbb{Z}_2$ modulo $x^8+x^4+x^3+x+1$.\\
+	Also K = $\mathbb{Z}_2[x]/(x^8+x^4+x^3+x+1)$. Das Polynom $x^8+x^4+x^3+x+1$ ist irreduzibel, also ist K ein Körper.\\
+	Die Elemente von K sind Polynome höchstens von Grad 7.\\
+	Darstellung als Bytes in Bitnotation oder Hexadezimal-notation.
+  \item P Ring der Polynome über K modulo $x^4$+1.\\
+	Das Polynom $x^4+1$ ist reduzibel, also ist P kein Körper.\\
+	Die Elemente von P sind Polynome höchstens von Grad 3.\\
+	Darstellung als Maschinenwörter (32 Bit) oder  Vierergruppe von Paaren von Hexadezimalziffern.\\
+	Manche Elemente haben Inverse:
+	$$03\:01\:01\:02\text{ hat Inverses }0B\:0D\:09\:0E$$
+\end{enumerate}
+	Multiplikation in P mit festem Polynom ($a_3,a_2,a_1,a_0$) berechnet weden durch Multiplikation einer festen Matrix mit dem Vektor.\\
+	Sei:
+	$$(d_3,d_2,d_1,d_0)=(a_3,a_2,a_1,a_0)\odot(b_3,b_2,b_1,b_0)$$
+	Dann gilt:
+	$$
+	  \begin{pmatrix}
+	    d_{0}\\
+	    d_{1}\\
+	    d_{2}\\
+	    d_{3}
+	  \end{pmatrix}
+	  =
+	  \begin{pmatrix}
+	    a_{0} & a_{3} & a_2 & a_{1} \\
+	    a_{1} & a_{0} & a_3 & a_{2} \\
+	    a_{2}  & a_1  & a_0 & a_3  \\
+	    a_{3} & a_{2} & a_1 & a_{0}
+	  \end{pmatrix}
+	  \odot
+	  \begin{pmatrix}
+	    d_{0}\\
+	    d_{1}\\
+	    d_{2}\\
+	    d_{3}
+	  \end{pmatrix}
+	  $$
+Matrix für MixedColumns:
+$$
+	  \begin{pmatrix}
+	    02 & 03 & 01 & 01 \\
+	    01 & 02 & 03 & 01 \\
+	    01 & 01 & 02 & 03 \\
+	    03 & 01 & 01 & 02
+	  \end{pmatrix}
+$$
+Einzelheiten zu Subbytes:
+$\sigma: K\rightarrow K$ sei def. durch 
+$$  \sigma_1(n) = \left\{ 
+  \begin{array}{l l}
+    0 & \quad \text{falls $n=0$ }\\
+    n^{-1} & \quad \text{sonst - hier steckt die Körper-Eigenscchaft von K}\\
+  \end{array} \right.
+$$
+$\sigma_2:K\rightarrow K $ ist def. durch:
+$$\sigma_2(n)=1F_{16}\odot n\oplus63_{16}  $$
+$$\sigma_2(n)=(1F*k)mod101_{16}\oplus63_{16} $$
+(Affine Abbildung auf K)\\
+$\sigma:K\rightarrow K$ ist def. durch:
+$$\sigma(n) = \sigma_2(\sigma_1(n))$$
+$\sigma_1$ liefert nicht-linearen Anteil\\
+$\sigma_2$ sorgt für Diffusion innerhalb eines Bytes.\\
+z.B. $\sigma(00_{16} = 63_{16})$.\\
+\\
+Berechnung der Rundenschlüssel (engl. key expansion, key schedule):\\
+S$_{r,i,j}$: Element in Zeile i, Spalte j des Rundenschlüssels S$_r$
+\begin{enumerate}
+ \item S$_0$ wird mit S spaltenweise aufgefüllt.
+ \item Für jede Runde $r\in\{1,\dots,10\}$ wiederhole:
+ \item Für jede Zeile $j\in\{0,1,2,3\}$ wiederhole:
+ \item $S_{r,i,0}:=S_{r-1,i,0}\oplus\sigma(S_{r-1,(i+1)mod4,3})\oplus C_{r,i})$\\
+	wobei
+      $$C_{r,i}:= \left\{ 
+	  \begin{array}{l l}
+	  x^{r-1} & \quad \text{falls $i=0$ }\\
+	  0 & \quad \text{sonst}\\
+	\end{array} \right.
+      $$
+  \item Für jede Spalte $j\in\{1,2,3\}$ wiederhole:
+  \item Für jede Zeile $i\in\{0,1,2,3\}$ wiederhole:
+  \item $S_{r,i,j}:=S_{r-1,i,j}\oplus S_{r,i,j-1}$
+\end{enumerate}
+
+
+\section{Schlüsselaustausch und Chiffre-Moden}
+\subsection{Diffie/Hellman-Schlüsselaustausch}
+Autoren: Whitfield Diffie, Martin Hellman, Ralph Merkle (1976)\\
+Ablauf:
+\begin{enumerate}
+ \item Alice und Bob einigen sich öffentlich auf zwei große Zahlen n und g. Dabei sei n eine Primzahl und $\frac{n-1}{2}$ eine Primzahl. ($\frac{n-1}{2}$ ist eine \underline{Sophie-Germain-Primzahl}\\
+ g sei eine \underline{Primitivwurzel}, d.h. alle Zahlen zwischen 1 und n-1 lassen sich modulo n als Potenzen von g darstellen.\\
+ z.B. Alice wählt solche n und g und sendet sie unverschlüsselt an Bob.
+ \item Alice wählt eine große Zahl x und hält sie geheim.\\
+	Bob wählt eine große Zahl y und hält sie geheim.
+ \item Alice berechnet $g^x$ mod n und sendet das Ergebnis unverschlüsselt an Bob.
+ Bob berechnet $g^y$ mod n und sendet das Ergebnis unverschlüsselt an Alice.
+ \item Alice berechnet ($g^y$ mod n)$^x$ mod n = $g^{xy}$ mod n
+ Bob berechnet ($g^x$ mod n)$^y$ mod n = $g^{xy}$ mod n
+\end{enumerate}
+
+$g^{xy}$ ist der gemeinsame Schlüssel von Alice und Bob.\\
+Charlie kenn n,$g$,$g^x$ mod n,$g^y$ mod n. Aber er kennt nicht x, y, $g^{xy}$ mod n. Um x aus $g^x$ mod n zu berechnen, muss Charlie den Logarithmus modulo n zur Basis g auf $g^x$ mod n anwenden
+
+\subsection{Stromchiffren}
+
+Schlüsselstromgenerator := Algorithmus, der aus einem vorgegebenen Schlüssel einen Schlüsselstrom erzeugt.\\
+\\
+Schlüsselstrom kann verwendet werden für bitweises EXOR: \glqq{}Stromchiffre\grqq{}.\\
+Typische Architektur:\\
+Zustandsautomat ohne Eingabe mit Ausgabe. Zustand = Bitvektor mit vorgegebener Länge n.\\
+Vorgegebene Bestandteile:
+\begin{description}
+ \item[init:] Zustand
+ \item[f:] Zustand$\rightarrow$Zustand
+ \item[g:] Zustand$\rightarrow\mathbb{B}$
+\end{description}
+Pseudocode für einen Schlüsselstromgenerator:
+\begin{enumerate}
+ \item z:=init
+ \item Endlos wiederholen:
+ \item z:=f(z)
+ \item Ausgabe g(z)
+\end{enumerate}
+
+Es gibt $2^n$ verschiedene Zustände. Nach spätestens $2^n$ Schritten wiederholt sich ein Zustand. Periodisches Verhalten mit Periode $\leq2^n$.\\
+\\
+Forderungen an einen Schlüsselstromgenerator:
+\begin{enumerate}
+ \item f und g sind Einweg-Funktionen. d.h. f(z) leicht berechenbar aus z. Urbild z von f(z) praktisch nicht berechenbar.
+ \item Die Periode ist viel größer als das verwendete Segment (Faustformel: mindestens um den Faktor 100).
+\end{enumerate}
+
+\subsection{Chiffre-Moden}
+
+Angriffsmöglichkeiten bei Blockchiffren:\\
+Gleicher Klartextblock liefert gleichen Geheimtextblock.\\
+Beispiel: Weihnachtsgeld
+\begin{description}
+ \item[$k_1$:] Boss
+ \item[$k_2$:] 10.000 Euro
+ \item[$k_3$:] Alice
+ \item[$k_4$:] 500 Euro
+ \item[$k_5$:] Charlie
+ \item[$k_6$:] 5 Euro
+\end{description}
+Charlie kann $G_6$ durch z.B. $G_4$ ersetzen.\\
+\\
+Abhilfe: Chiffre-Modus:= Klartextblöcke nicht immer gleich verschlüsseln.\\
+\begin{enumerate}
+ \item Naive Lösung: Electronic Code Book Mode (ECB)
+ \item Cipher BLock Chaining (CBC)\\
+ Statt $K_i$ wird $K'_i$ verschlüsselt, wobei
+ $$  K'_1 := \left\{ 
+  \begin{array}{l l}
+    IV\oplus K_0 & \quad \text{,falls $i=0$ }\\
+    G_{i-1}\oplus K_i & \quad \text{sonst}\\
+  \end{array} \right.
+$$
+Initialisierungsvektor(IV):= Parameter, der Verschlüsselung variiert.\\
+IV wird willkürlich gewählt und im Klartext mit übertragen. Die Variierung soll die Angriffsfläche verringern.
+%Abbildung Verschlüsselung mit CBC-Modus
+\item Cipher Feedback Mode (CFB):\\
+Geeignet für Dialoge, byteweise Kommunikation. Um das i-te Byte zu verschlüsseln, wird ein 128-Bit-Block aus den Bytes $i-16,\dots,i-1$ des Geheimtexts (der IV liefert die Geheimtextbytes mit Nummer $-16,\dots,-1$) gebildet, mit der Blockchiffre verschlüsselt, und das niedrigstwertige Byte des Ergebnisses mit dem Klartextbyte bitweise EXOR-verknüpft.\\
+Beispiel: i=42. Das 42. Klartextbyte soll verschlüsselt werden.\\
+Geheimtextblock: $g_{26},\dots,g_{41}$\\
+Ergebnisse der Verschlüsselung mit der Blockchiffre: $g'_{15},\dots,g'_{0}$\\
+$K_{42}\oplus g'_0$ ist das Ergebnis.
+\end{enumerate}
+
+
+
+\section{Asymmetrische Kryptosysteme}
+
+\section{Digitale Unterschriften}
+
+\section{Streuwerte}
+
+\section{Schlüsselverwaltung}
+
+\section{Beglaubigungprotokolle}
+
+\section{Sichere Kommunikation}
+
+
+\begin{thebibliography}{9}
+\bibitem{Tanenbaum}
+Andrew S. Tanenbaum: Computer Networks, Pearson 2003
+
+\bibitem{Handbook}
+A.J. Menezes, P.C. van Oorschot, S.A. Vanstone: Handbook of Applied Cryptography, CRC Press 2002
+\end{thebibliography}
+
+
+\end{document}

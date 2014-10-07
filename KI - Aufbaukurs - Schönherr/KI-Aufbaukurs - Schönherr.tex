@@ -1,0 +1,815 @@
+\documentclass[a4paper,14pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{listings}
+\usepackage{float}
+\usepackage[ngerman]{babel}
+\usepackage{enumerate}
+
+\title{KI - Aufbaukurs - Schönherr}
+\author{Hans-Christian Heinz\\
+hheinz@imn.htwk-leipzig.de\\
+CC-BY-NC-SA 4.0}
+\date{WS2012/13}
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+
+\section{Wissensrepräsentation (ausgewählte Kapitel)}
+\begin{itemize}
+ \item Prädikatenlogik vorausgesetzt
+ \item Frames vorausgesetzt
+\end{itemize}
+
+\subsection{Semantische Netze}
+
+\subsubsection{Grundlagen}
+
+
+Wunsch nach grafischer Veranschaulichung prädikatenlogischer Ausdrücke und natürlichsprachlicher Sätze\\
+\\
+Idee: Darstellung von 2-stelligen Prädikaten zwischen Objekten durch Graphen\\
+\\
+\begin{description}
+ \item[Knoten:]konkrete oder abstrakte Objekte
+ \item[Kanten:]Beziehungen (binäre Relationen)
+\end{description}
+
+Problem: 2-Stelligkeit der Relation
+
+Verwendung verschiedener Kantentypen, die bezeichnet werden ($\to$ verschiedene Prädikate)
+
+==> Semantisches Netze
+
+p(a,b) wird repräsentiert durch $a \to^{p} b$
+
+\glqq{}Standardisierte Namen\grqq{} für häufige Kantennamen
+
+\begin{itemize}
+ \item is\_a	isa	-	Klasse-Instanz
+ \item a\_kind\_of	ako	-	Klasse-Unterklasse
+ \item is\_part\_of
+ \item is\_connected\_with
+ \item $\vdots$
+\end{itemize}
+
+
+Beispiel:\\
+\\
+\\
+\\
+
+Vorteile:
+\begin{itemize}
+ \item effiziente Repräsentation (Graphen
+ \item Rel. zwischen Objekten entsprechen Zugriffspfaden
+ \item Wissen organisierbar (z.B. Hierarchien)
+\end{itemize}
+
+Nachteile:
+\begin{itemize}
+  \item Probleme mit Ableitungen
+  \item deklarative Semantik erklärbar über Abbildung auf eine äquivalente Logikrepräsentation
+  \item keine Standards
+  \item Gefahr der Unübersichtlichkeit
+\end{itemize}
+  
+\subsubsection{Nicht-2-stellige Prädikate}
+
+\begin{enumerate}[(a)]
+ \item  1-stellige Prädikate\\
+	Einführung eines Dummy-Symbols \emph{d}
+	p(a) wird repräsentiert durch
+	$$a \xrightarrow{p} d $$
+	(also p(a,d)\\
+	oder (alternativ zum Dummy - d)
+	$$a\xrightarrow{isa}p $$
+	\glqq Typ p\grqq{} wird jetzt als Objekt betrachtet (Klasse)
+\item 	Darstellung eines 3-stelligen Prädikates p(a,b,c)\\
+	Relation (Prädikat) p wird aufgespalten
+	Einführung
+	\begin{itemize}
+	\item eines \glqq Ereignisses\grqq{} e
+	\item dreier Ersatz-Prädikate
+	\end{itemize}
+	$$p(a,b,c)\leftrightarrow p_1(e,a)\wedge p_2(e,b) \wedge p_3(e,c) $$
+	Preis: Veränderung der Sprache
+\item	Am Knoten kann auch ein Netz stehen ($\to$Hierarchien)
+\end{enumerate}
+
+\subsubsection{Darstellung allgemeiner prädikatenlogischer Ausdrücke}
+
+\begin{enumerate}[(a)]
+ \item Skolemisierung\\
+	Bsp. (Nilsson: Principles of AI)\\
+	\glqq{}John gab Mary das Buch\grqq{}\\
+	$\downarrow$prädikatenlogische Darstellung\\
+	geben(john,mary,book)\\
+	ge(neue Konst.): Menge von Gebe-Ereignissen\\
+	\begin{equation}
+	 geben(john,mary,buch) \leftrightarrow \exists X E (X,ge)\wedge geben(X,john) \wedge empfaenger(X,mary) \wedge objekt(X,buch)
+	\end{equation}
+	
+	Skolemisierung(Skolem.-Konst. g für X) ergibt\\
+	\begin{equation}
+	 E(g,ge)\wedge empfaenger(g,mary)\wedge geber(g,john) \wedge objekt(g,buch)
+	\end{equation}
+
+	oder: Einführung von (neuen) Funktionen\\
+	\glqq = \grqq{} bedeute die Gleichheit von Termen\\
+	Nach Skolemisierung folgt\\
+	\begin{equation}
+	 E(g,ge) \wedge =(geber(g),john) \wedge =(empfaenger(g),mary) \wedge =(objekt(g),buch)
+	\end{equation}
+	
+\item 	Konjunktion: beide Pfeile im Netz
+
+\item 	Disjunktion: p(a,b) $\vee$ q(c,d)
+	\begin{equation}
+	 a \xrightarrow{p} b
+	\end{equation}
+	\begin{equation}
+	 c \xrightarrow{q} d
+	\end{equation}
+	\item Negation: Markierung der Prädikate (wie bei Disjunktion)\\
+	Beispiel:
+	\begin{equation}
+	 \neg(p(a,b)\wedge q(b,c) \cong \neg p(a,b,) \vee \neg p(b,c)
+	\end{equation}
+	
+\item	Implikation\\
+	Ausnutzung von $(p(\bullet,\bullet)\to q(\bullet,\bullet))\cong (q(\dots)\vee p(\dots)$
+
+\item	Quantoren\\
+	Var. an Knoten kann
+	\begin{itemize}
+	 \item existenziell
+	 \item allquantifiziert
+	\end{itemize}
+	sein\\
+	Bei \glqq$\exists$\grqq{} - vorher Skolemisierung\\
+	Bsp.: \glqq{}John gab jedem irgendetwas.\grqq{}\\
+	Logikrepräsentation mit 2-stelligen Prädikaten:
+	\begin{equation}
+	 \forall X \exists Y \exists Z \{ E(Y,ge) \wedge geben(Y,john) \wedge empfaenger(Y,X) \wedge objekt(Y,Z)\}
+	\end{equation}
+	Skolemisierung (Beseitigung von \glqq$\exists$\grqq{})
+	\begin{equation}
+	 \forall X \{ E(g(X),ge)\wedge geber(g(X),X) \wedge objekt(g(X),o(X))\}
+	\end{equation}
+	g(x) ist eine Skolemfunktion
+	\begin{equation}
+	 john \xrightarrow{geber}g(X)\xrightarrow{empfaenger}X\xrightarrow{E}mensch
+	\end{equation}
+	%siehe Franz' Mitschrift für komplette grafik 
+\end{enumerate}
+
+\subsubsection{Nutzung semantischer Netze}
+Günstig, wenn 2-stellige Präd. Normalfall sind\\
+$\bullet,\bullet \wedge \bullet$\\
+Netzwerk-Sprachen für 
+\begin{itemize}
+ \item Manipulation in Netzen
+ \item Suche nach Knoten, Kanten, Wegen |$\to$Inferenz (Ableiten)
+ \item Umgang mit Funktionen
+\end{itemize}
+
+\subsection{Constraint-Netze}
+Constraint: Relation (bzw. Prädikat) $p(X_1,..X_n)$ \\
+einschränkende Bedingung für Variablen oder eine Gleichung (spez. Fall)\\
+\\
+Constraint-Netz: Graph, bei dem
+\begin{itemize}
+ \item Knoten: Relation zw. Obekten repräsentieren
+ \item Kanten: Gemeinsame Argumente zweier Rel-Symbole repräsentieren
+\end{itemize}
+
+\subsection{Analoge WR}
+Synonym: Direkte WR\\
+keine wirkliche Modellierung\\
+Repräsentation in einer Syntax, die der realen Welt \glqq{}analog\grqq{} ist.
+Bsp.:
+\begin{itemize}
+ \item Bilder
+ \item Landkarten
+ \item Musiknoten
+ \item chemische Formel
+ \item grafische Darstellung
+ \item $\vdots$
+\end{itemize}
+
+Syntax nicht einheitlich, dafür zweckspezifisch\\
+Semantik intensional\\
+\\
+Vorteile:\\
+Kleine Änderungen in Realität $\leftrightarrow$ kleine Änderungen in der Repräsentation\\
+hoher Informationsgehalt\\
+Nachteile:\\
+Probleme beim autom. Auswerten des Wissens\\
+Aktualisierung des Wissens, Folgen\\
+
+\subsection{Skripte}
+Strukturierte Beschreibung stereotyper Abläufe (z.B. Auto starten)\\
+\\
+Repräsentation ovn Abläufen, Bed. dafür, erforderliche mathematische Voraussetzungen\\
+Beschreibung typischer Szenen $\rightarrow$ Ähnlichkeit zu frame-artiger Darstellung (ähnlich wie Objektorientierung)\\
+\\
+Übungsaufgabe: \glqq{}Der Dekan schüttelte zur Begrüßung jedem die Hand.\grqq{} modellieren als semantisches Netz
+
+\section{KI-Suchmethoden}
+\subsection{Optimierung und heuristisches Problemlösen}
+Problemlösung in KI-Anw.
+\begin{itemize}
+ \item Algorithmen
+ \item allg. Rahmen für Problemlösungen (Problemlöse-Paradigmen
+\end{itemize}
+
+KI-Algorithmen sind meist heuristischer Natur\\
+oft diskrete Optimierungsaufgaben ($\rightarrow$Graphensuche)\\
+diskret:Analysis nicht anwendbar\\
+Terminologie
+$$G = (K,R) ~~~~~~~~R\subseteq K x K $$
+K: Knotenmenge\\
+R: Relation, 2-stellig;Kantenmenge\\
+O - Menge von Operationen
+$$o\in O, o: K\rightarrow K$$
+
+K oft nicht explizit gegeben, im Prinzip jeder Knoten berechenbar\\
+o interpretierbar als Zustandstransformation\\
+\\
+Meist Zustandsfolge Z (implizit) gegeben, Z $\subset$K\\
+Zustandsfolge (mit Op.) gesucht mit Endzustand $\in$ Z\\
+\\
+Problem P: P = [a,K,Z,O]\\
+a: Anfangszustand, a $\in$ K
+Knotenarten:
+\begin{itemize}
+ \item ODER-Knoten zur Beschreibung alternativer Vorgehensweisen
+ \item UND-Knoten zur Beschreibung der Aufspaltung eines Problems in Teilprobleme, die alle zu lösen sind
+\end{itemize}
+
+\subsection{Problemlöse-Paradigmen}
+\subsubsection{Erzeuge-und-teste-Prinzip (generate and test method)}
+2 Programm- / Komponenten
+\begin{itemize}
+ \item Generator zur Erzeugung möglicher Lösungen
+ \item Tester zum Testen einer Lösung auf Brauchbarkeit
+\end{itemize}
+Abbruch-Bedingung.:
+\begin{itemize}
+ \item akzeptable Lösung gefunden, oder
+ \item bei mehreren Lösungen auswählen, oder
+ \item Unlösbarkeit feststellen
+\end{itemize}
+
+%Programmablaufplan, von Sam oder Franz holen
+
+Anwendung bei Identifikationsproblemen\\
+Fall liegt vor.\\
+Mit welchem bekannten Fall ist er identisch/ähnlich?\\
+($\rightarrow$ fallbasiertes Schließen)\\
+Anforderungen an den Generator:
+\begin{itemize}
+ \item Vollständigkeit, d.h. Generierbarkeit \underline{aller} möglichen Lösungskandidaten
+ \item Redundanzfreiheit
+ \item Informiertheit: Wissen über Enschränkung der Möglichkeiten einbringen
+\end{itemize}
+
+\subsection{Problemlöse-Paradigmen}
+\subsubsection{Erzeuge-und-teste-Prinzip}
+Beispiele
+\begin{enumerate}[(a)]
+ \item SEND/MORE=MONEY
+ \item Safe-Knacken
+ \item DENDRAL (Chemie-Expertensystem, seit 50 Jahren im Einsatz)\\
+ Problemstellung: chem. Substanz zu identifizieren\\
+ Zuerst:Bestimmung der Anzahl der Atome jeder Sorte in einem Molekül\\
+ Beschuss der Moleküle mit hochenergetischen Elektronen\\
+ $\rightarrow$Zerbrechen der Moleküle in geladene Teilchen verschiedener Größe\\
+ Bruchstücke werden durch ein Magnetfeld geschickt\\
+ Generierung von Isomeren(Simulation)\\
+ Generierung von Massenspektrogrammen zu diesen Isomeren\\
+ Vergleich (Mustererkennung) mit realen Spektrogrammen\\
+\end{enumerate}
+
+\subsubsection{Differenzmethode (means-ends analysis}
+G=(K,R) geg.\\
+Idee:\\
+k - Problemlöse-Zustand k $\in$K
+aktueller Zustand $\xrightarrow{? Folge von Uebergaengen gesucht}$gewünschter Zustand z$\in$Z\\
+Erzeugung eines Nachfolge-Zustandes, der \glqq{}dichter\grqq{} am Zielzustand liegt (besseres Zwischenergebnis)\\
+Voraussetzung: \glqq{}Entfernung\grqq{} zum Ziel zu definieren\\
+Metrik d(k,z) zwischen Zuständen definieren\\
+Verfahren
+\begin{itemize}
+ \item Expandieren eines Knotens\\
+ ~~~~~~$\rightarrow$Berechnung der Nachfolger (1 Schritt)
+ \item
+\end{itemize}
+
+Probleme z.B. bei Irrgarten-Aufgaben: Umwege, Sackgassen\\
+Bsp.: Routenplanung
+
+\subsubsection{Problemreduktion (goal reduction)}
+Idee: Zerlegung eines Problems in leichter lösbare Teilprobleme\\
+$\rightarrow$ Generierung eines Problembaumes\\
+Wurzel: geg. Problem\\
+$\vdots$\\
+Blätter: relativ einfach lösbare Einzelprobleme\\
+i.A. UND-ODER-Baum\\
+\begin{itemize}
+ \item verschiedene Zerlegunsarten (ODER)
+ \item für konkrete Zerlegung alle Teilprobleme lösen (UND)
+\end{itemize}
+
+Bsp.:
+\begin{enumerate}[(a)]
+ \item Turm von Hanoi\\
+ %Grafik Hanoi
+ Turm der Höhe n gegeben\\
+ (1) \~ n-1 umsetzen\\
+ (2) \~ 1 umsetzen\\
+ (3) \~ n-1 umsetzen\\
+ \item Konfiguration von Tagebau Bandanlagen (1986-1990)\\
+ UND-ODER\\
+ %Grafig Tagebau-Bandanlage
+\end{enumerate}
+
+\subsection{Suchalgorithmen ohne Kostenfunktion}
+Gegenstand: diskrete Suchprobleme in Graphen\\
+Problem: 
+\begin{itemize}
+ \item Finden eines ausgezeichneten Knotens (Schatzsuche)
+ \item Finden eines bestimmten Weges
+\end{itemize}
+
+Vorgehen:
+\begin{itemize}
+ \item Erzeugen eines Suchbaumes der nach bestimmten Prinzip ($\rightarrow$verschiene Algorithmen) abgesucht wird
+\end{itemize}
+
+Graphensuche $\rightarrow$ Suche im Baum\\
+\\
+%Grafik Graph
+\\
+Weg von s nach z gesucht\\
+\\
+%Grafik Baum
+
+\subsubsection{Tiefe-zuerst-Suche}
+%Grafik Tiefe zuerst Suche
+
+Vor. für Finden von Z
+\begin{itemize}
+ \item endlicher Graph
+ \item Es existiert mind. 1 Zielknoten
+ \item hinreichende Vernetzung
+\end{itemize}
+
+\subsubsection{Breite-zuerst-Suche}
+wie Tiefensuche\\
+einzige Änderung: nicht expandierte Nachbarn \underline{hinten} an OPEN anfügen\\
+
+\subsubsection{Nichtdeterministische Suche}
+Kompromiss zwischen Tiefen- und Breitensuche\\
+Programmablaufplan wie in 2.3.1 aber Änderung des 1. Befehls in Schleife\\
+Auswahl eines zufälligen Knotens aus OPEN
+
+\subsection{Suchalgorithmen mit Kostenfunktion}
+\subsubsection{Bergsteigen (hill climbing)}
+G=(K,R) geg.\\
+B - Bewertungsfunktion B: K$\rightarrow$R\\
+feste Bewertung für Zielfunktion\\
+s$\in$K sei gegeben (Startknoten = Anfangszustand)\\
+z$\in$K gesucht, so dass für alle k$\in$K gilt B(z)$\geq$B(k)\\
+\\
+\\
+
+%KW 44 fehlt
+
+%KW 45
+
+
+Weitere Bsp.:
+\begin{enumerate}[(a)]
+ \item Breitensuche in einem Baum\\
+	Wähle $\forall(k,n) (k,n)\in\mathbb{R}\rightarrow e(k,n)=1$\\
+	$\forall k h(k)=0 $
+	$\rightarrow$ g(k) ist der Rang von k
+ \item Tiefensuche in einem Baum\\
+	Wähle f(s)=0 und $\forall(k,n), (k,n)\in\mathbb{R}\rightarrow f(n)=f(k)-1$\\
+	Auswahl des Knotens mit negativster Bewertung
+ \item Backtracking mit beschränkter Tiefe\\
+       Tiefensuche wie bei b), aber Schranke für f vorgegeben\\
+       Entfernung eines Knotens von OPEN, wenn Schranke unterschritten wird
+  \item Branch-and-Bound-Algorithmus ergibt sich als Spezialfall $\forall k h(k)=0$
+\end{enumerate}
+
+Informiertheit (Lit.: Richter)\\
+\\
+Def.: h$_1$ und h$_2$ seien optimistisch, h$_2$ heißt besser (nicht schlechter) informiert als h$_1$, wenn für alle k $\in$K gilt
+$$h_1(k)\leq h_2(k)$$
+Folgerung: Jeder Knoten, der bei Verwendung von h$_2$ expandiert wird, wird auch bei Verwendung von h$_1$ expandiert.\\
+Dann: K$^*$ - optimale Gesamtkosten\\
+k wird expandiert bei $f_2(k)=g(k)+h_2(k)<K^*$\\
+dann erst recht bei $f_1(k)=g(k)+h_1(k)<K^*$\\
+\\
+Verhalten des A$^*$-Algorithmus\\
+Def.: h heißt monoton, wenn für alle Paare (k,n) $\in\mathbb{R}$\\
+$$h(k)\leq e(k,n)+h(n)$$
+Satz: Monotone Funktionen sind optimistisch\\
+Bsp: einer opt. nicht monotonen Schätzfunktion
+$$k\xrightarrow{4}n\xrightarrow{3}z$$
+n(k)=6~~~~~~~~~~~~~~~~~~~h(n)=1\\
+fast realistisch~~~~~~~~~gewachsener Optimismus\\
+Satz: Es gibt für monotone h\\
+\begin{enumerate}[(a)]
+ \item $g(k)=g^*(k) fuer k\in CLOSED$
+ \item k sei nach m expandiert worden $\rightarrow f(k)\leq f(m)$
+ \item Wenn k expandiert wurde, gilt: $g^*(k)+h(k)\leq K^*$
+ \item Jeder Knoten k mit $g^*(k)+h(k)<K^*$ wird expandiert
+ \item Komplexität des A$^*$-Algorithmus'\\
+	N - Anzahl der expandierten Knoten: Komplexität O(n)
+\end{enumerate}
+Hauptproblem: gute Funktion h\\
+\\
+3. Beispiel:\\
+Von Franz holen
+\\
+\\
+\subsubsection{A0$^*$-Algorithmus}
+
+für AND-OR-Graphen\\
+z.B. für Problemzerlegungen\\
+Hyperkanten (Weglängen) zu bewerten\\
+h muss Hyperkanten berücksichtigen\\
+Lit.: Nilsson
+
+\subsubsection{Übersicht zu den Suchverfahren}
+\begin{tabular}{l|l}
+Paradigmen			&	entspr. Verfahren\\\hline
+Generieren und Testen		&	einfache uninformierte Suchverfahren\\
+Differenzmethode		&	Verfahren mit Kostenfunktion (v.A. A$^*$)\\
+Problemreduktion		&	A0$^*$-Alg.\\
+\end{tabular}\\
+
+Verfahren ohne Kostenfunktion
+\begin{itemize}
+ \item Tiefensuche
+ \item Breitensuche
+ \item Nichtdeterministische Suche
+\end{itemize}
+
+Verfahren mit Kostenfunktion\\
+\\
+\begin{tabular}{l|l}
+Verfahrensname			&	Idee\\\hline
+British-Museum-Prozedur		&	erschöpfende Suche\\
+Hill climbing			&	Auswahl einer lokal besten Richtung\\
+Strahlensuche			&	Verfolgen mehrerer Richtungen\\
+Bestensuche			&	OPEN-Liste aller aktuellen nicht expandierten Knoten\\
+Branch-and-Bound-Methode	&	Weglassen hoffnungsloser (Teil-)Wege\\
+A-Alg.				&	Schätzfunktion h für den Restweg (von k aus)\\
+A$^*$-Alg.			&	s.o.\\
+A0$^*$				&	A$^*$-Erweiterung für AND-OR-GRAPHEN
+\end{tabular}
+
+\subsection{Strategische Spiele}
+\subsubsection{Allgemeines zu strategischen Spielen}
+Spiel wird als Graph dargestellt\\
+\begin{description}
+ \item[Knoten:] Spielzustände
+ \item[Kanten:] Verbindung eines Spiel-Zustandes mit einem anderen, wenn Nachfolge-Zustand durch Aktion (zul. Zug) entsteht
+ \item[Partie:] ein Weg durh den Baum (Schach: Weglänge $<$ 200)
+\end{description}
+$\rightarrow$ Menge der Partien im Graph vollst. repräsentiert -- bester Zug ablesbar
+
+\subsubsection{Minimax-Strategie}
+Idee: Auswahl des Zuges, der nach bestem Gegnerzug die beste Bewertung liefert\\
+$\rightarrow$ folgende Aufgaben zu lösen:
+$$z_j(z_i(s)) $$
+
+\section{Klassische Logik-Ergänzungen - Elemente der klassischen Logik}
+\subsection{Kalküle}
+\begin{description}
+ \item[Kalkül:] Syntax und Semantik einer Logik seien gegeben\\ ($\rightarrow$ Modell,  Folgerung)\\
+		Hinzunahme einer Ableitungsrelation zum Nachbilden des Folgebegriffes
+\end{description}
+
+Korrektheit und Vollständigkeit des Kalküls von Interesse\\
+\\
+Korrektheit $\Leftrightarrow$ Was ableitbar ist (laut dem Kalkül), folgt auch\\
+\\
+Deduktion: Sprache 1. Ordnung gegeben\\
+M-Menge aller log. Ausdrücke\\
+W,W$_1$,W$_2$ - geg. Mengen logischer Ausdrücke\\
+$\vdash$ -  Ableitungsfunktion\\
+$A(W) = {a\in M | W \vdash a}$\\
+$\vdash$ heißt deduktiv, wenn folg. Bedingungen erfüllt sind:
+\begin{enumerate}
+ \item Einbettung: $W\subseteq A(W)$
+ \item Monotonie: $W_1\subseteq W_2 \Rightarrow A(W_1) \subseteq A(W_2)$
+\end{enumerate}
+
+Beispiele klassischer Deduktionsrelationen\\
+\begin{enumerate}[(a)]
+  \item Gentzen-Kalkül\\
+	Anliegen: Formalisieren von im Ma gebräuchlichen Schlussregeln\\
+	Einfachste Variante: 13 Regeln, kein Axiom\\
+	W - Wissensbasis (Menge log. Ausdrücke)\\
+	p(X), q(X) - log. Ausdruck, abh. von X\\
+	$W \cup \{p\} \vdash q$, q ableitbar aus W unter Annahme p\\
+	Schreibweise [p] q
+	\begin{enumerate}[(1)]
+	  \item	Und-Einführung\\
+		$$\frac{p, q}{p\land q}$$ 
+	  \item Und-Beseitigung
+		$$\frac{p\land q}{p}, \frac{p\land q}{q}$$
+	  \item Oder-Einführung
+		$$\frac{p}{p\lor q}, \frac{q}{p\lor q}$$
+	  \item Oder-Beseitigung
+		$$\frac{p\lor q,[p]r,[q]r}{r}$$
+	  \item Folgt-Einführung
+		$$\frac{[p]q}{p\rightarrow q}$$
+	  \item Folgt-Beseitigung (Modus Ponens, Abtrennungsregel)
+		$$\frac{p,p\rightarrow q}{q}$$
+	  \item	$\forall$-Einführung
+		$$\frac{p(Y)}{\forall X p(X)}$$
+		Bem.: p(Y) von keiner Anname abhängig, in der Y vorkommt
+	  \item $\forall$-Beseitigung
+		$$\frac{\forall X p(X)}{p(Y)}$$
+	  \item $\exists$-Einführung
+		$$\frac{p(Y)}{\exists x p(X)}$$
+	  \item $\exists$-Beseitigung
+		$$\frac{\exists X p(X),[p(Y)]q}{q}$$
+	  \item $\neg$-Einführung
+		$$\frac{[p]\Box}{\neg p}$$
+	  \item	$\neg$-Beseitigung
+		$$\frac{p, \neg q}{\Box}$$
+	  \item Widerspruchsregel
+		$$\frac{\Box}{p}$$
+	\end{enumerate}
+	\{1.,...,13.\} modelliert die intuitionistische Prädikatenlogik\\
+	Kalkül korrekt, aber nicht vollständig\\
+	Hinzunahme des (einzigen) log. Axioms $p\lor\neg p$\\
+	\{1.,...,13.,$p\lor\neg p$\}
+	Kalkül ist korrekt und vollständig
+  \item	Klassischer Kalkül (Gödel)\\
+	15 aussagenlogische Axiome (AXA)\\
+	8 prädikatenlogische Schlussregeln (u.a. Modus Ponens)\\
+	Korrektheit und Völlständig
+  \item	Resolutionskalkül (SLD-Res. als Grundlage für Prolog)\\
+	eine Schlussregel\\
+	Korrektheit, Widerlegungsvollständigkeit (keine \glqq{}vollständige\grqq{} Vollständigkeit)
+\end{enumerate}
+Vergleich des deduktiven Schließens mit anderen Paradigmen\\
+Urne mit Kugeln geg.\\
+Syllogismen (Schlussfiguren)\\
+\begin{description}
+ \item[Deduktion:]	Alle Kugeln sind weiß.\\
+			Diese Kugeln sind aus der Urne.\\
+			Diese Kugeln sind weiß.
+\end{description}
+Schluss vom Allg. auf das Besondere\\
+\begin{description}
+ \item[Induktion:]	Diese Kugeln ins weiß.\\
+			Diese Kugeln stammen aus der Urne.\\
+			Dann sind alle Kugeln in der Urne weiß.\\
+\end{description}
+Schluss vom Besonderem auf das Allgemeine (kein korrektes Schließen)
+\begin{description}
+ \item[Abduktion:]	Alle K. in U. sind weiß\\
+			Diese K. sind weiß\\
+			Diese K. stammen aus U.
+\end{description}
+Umkehrung der Implikation, Suche nach Ursachen.
+$$\frac{p\rightarrow q,q}{p}$$
+$\rightarrow$ Schluss nicht korrekt\\
+\\
+Formalisierung des Gleichheitsbegriffs\\
+Gleichheitsaxiome
+\begin{description}
+ \item[Reflexivität:] $\forall X\: X=X $
+ \item[Symmetrie:] $\forall X\forall Y\: X=Y\rightarrow Y=X$
+ \item[Transitivität:] $\forall X\forall Y\forall Z\: X=Y\land Y=Z\rightarrow X=Z$
+\end{description}
+Substitutionsaxiome für Funktions- und Prädiktensymbole
+\begin{itemize}
+ \item f - Fkt.-Symbol 
+ \item p - Präd.-Symbol 
+\end{itemize}
+beide n-stellig\\
+\\
+$$\forall X_1 \dots \forall X, \forall Y \:\:X_i=Y\rightarrow f(x_1,\dots,x_i,\dots,x_n)=f(x_1,\dots,Y,\dots,x_n)$$
+$$\forall X_1 \dots \forall X, \forall Y \:\:X_i=Y\rightarrow \{p(x_1,\dots,x_i,\dots,x_n)\rightarrow p(x_1,\dots,Y,\dots,x_n)\}$$
+
+Probleme mit \glqq{}=\grqq{}:
+\begin{itemize}
+  \item Blindes Substituieren im Gl.-Beweisen $\Rightarrow$kombinatorische Explosion
+  \item Resolution nicht umkehrbar
+\end{itemize}
+Auswege:
+\begin{itemize}
+ \item Paramodulation (Schlussregel)
+ \item Termersetzungssysteme
+\end{itemize}
+
+\subsection{Herbrandt-Modelle}
+Motivation: Zusammenhang zwischen Syntax und Semantik\\
+Gegeben: Sprache 1. Ordnung (L), Basis B = [IS,PS,FS]
+\begin{description}
+ \item[IS:] Individuensymbole $\rightarrow$Konstantensymbole $\neq\emptyset$ oder Var.-Symbole
+ \item[PS:] Prädikatensymbole
+ \item[FS:] Funktionssymbole
+ \item[Grundterm:] variablenfreier Term
+ \item[Grundatom:] var.-freies Atom
+ \item[Herbrand-Universum (HU):] Menge aller Grundterme von L
+ \item[Herbrand-Basis (HB):] Menge aller Grundatome von L
+\end{description}
+
+Beispiel: f-Fkt.-Symbol - 3-stellig\\
+Interpretation: f(I,X,Y) bezeichne das I-te Kind von den Personen X,Y\\
+Grundterme: anna, franz, f(1,fritz,ina), f(7,f(3,paul,anna),max)\\
+Grundatome: w(anna), oma(fritz,max), m(f(1,fritz,ina))\\
+Herbrand-Interpretation: Interpretation, die
+\begin{itemize}
+ \item Symbol aus der Menge der Konstantensymbole eben dieses Symbol als Wert zuweist
+ \item Symbol f $\in$ FS eine Abbildung aus HU$^n\rightarrow HU$ zuordnet, so dass $$(t_1,\dots,t_n)\in HU^n \rightarrow f(t_1,\dots,t_n)\in HU^n $$
+ \item jedem Grundatom einen der Werte true oder false zuweist
+\end{itemize}
+P -  Menge abgeschlossener Ausdrücke (d.h. keine freien Var.)\\
+Herbrand-Modell: H-Int., die Modell für P ist\\
+Bem.: H\\
+
+
+
+%KW 46 fiel ausgewählte
+
+%KW 47
+Herbrand-Interpretation HI1, HI2\\
+\\
+HI1: p(b), p(f(a)), p(f(c)), p(f(f(b))), p(f(f(f(a)))), $\dots$\\
+q(a,b),q(a,c),$\dots$,q(c,c),q(a,f(a)),$\dots$\\
+HI2: p(a), p(f(a),p(f(b)),p(f(c)),p(f(f(a))),$\dots$\\
+q(f(a),a),$\dots$,q(f(f(b)),a),$\dots$\\
+\\
+Durchschnitt HI1 $\cap$ HI2 ist auch Modell für P
+$$L=\{p(f(a)),p(f(c)),p(f(f(b))),\dots,q(a,f(a)),\dots\}$$
+Satz 1: Der Durschnitt von H-Modellen ist H-Modell\\
+\\
+Satz 2: P-Menge von Programmklauseln, P habe ein Modell\\
+$\rightarrow$ P hat ein H-Modell\\
+Beweis: Int sei ein Modell für P. Dann ist
+$$\text{Int} = \{p(t_1,\dots,t_n)\in HB: p(t_1,\dots,t_n)\}\text{ wahr bez. Int}$$
+ein Modell für P.\\
+\\
+Satz 3: P wie oben. P ist genau dann unerfüllbar, wenn P kein H-Modell hat.\\
+\\
+Sätze 2 und 3 gelten nur im Falle von Prolog-Klauseln.\\
+\\
+%hier fehlt ein stück
+
+\subsection{Gleichungswissen}
+\subsubsection{Die Paramodulationsregel}
+Geg.: 2 Klauseln (Disjunktion von Literalen)\\
+$$\text{K}_1\text{:  }p_1\vee p_2\vee \dots \vee p_m$$
+$$\text{K}_2\text{:  }r=s \vee q_2 \vee \dots \vee q_n$$
+p$_1$ enthalte den Term t (möglicherweise als Teilterm), r und t unifizierbar, d.h.
+$$\cup(r)=^{syn}\cup(t)$$
+$\cup$ -- allgemeiner Unifikator\\
+\\
+p$_1$' ergebe sich aus p$_1$ durch Ersetzung von t durch s\\
+\\
+Paramodulant von K$_1$ und K$_2$:
+$$\cup(p_1'\vee \dots \vee p_m \vee q_2 \vee \dots \vee q_n)$$
+%hier fehlen Dinge
+Satz: die Paramodulationsregel ist korrekt.
+
+%hier fehlen ziemlich viele Dinge
+%KW54(KW2)
+
+\section{}
+
+\glqq{}unless\grqq{} ist schon in Prolog: \glqq{}(backslash)+\grqq{}
+
+\paragraph{TMS} (truth maintenance system)\\
+zur Überprüfung bereits erfolgter Schlüsse (bei veränderten Annahmen)\\
+Basis sind Protokolle über erfolgte Schlüsse\\
+verschiedene Protokoll-Aufbereitungen möglich\\
+TMS $\rightarrow$ JTMS (justification-based TMS) oder ATMS (assumption-based TMS)
+
+\subsection{Einfache Revisionsmechanismen}
+\begin{enumerate}
+ \item Neuberechnung aller Schlussfolgerungen aus geänderten Ausgangsdaten (Zeit!)
+ \item Speichern eines Protokolls von Schlussfolgerungen\\
+	Neuberechnung von der Stelle im Protokoll aus, wo erste Änderung relevant wird
+	\\$\rightarrow$höherer Speicheraufwand, gewissen Zeiteinsparung (unzureichend)
+\end{enumerate}
+
+\subsection{JTMS}
+
+Protokoll-Aufbereitung bei Änderung von Annahmen\\
+Nachvollziehen der Interferenzen\\
+Streichen nicht mehr erlaubter Ableitungen\\
+Abhängigkeitsnetz\\ %von Franz holen (Prüfungsrelevant)
+
+\begin{tabular}{l|l|l}
+Annahmen/Fakten			&	Regeln			&	Schlussfolgerungen	\\\hline
+vs $\rightarrow$		&	(1) $\rightarrow$	&	vw			\\
+				&	(2) $\rightarrow$	&	pb			\\
+ab $\rightarrow$		&				&				\\
+$\neg$ew $\rightarrow$		&	(3)$\rightarrow$	&				\\
+\end{tabular}
+
+Regel anwendbar $\Leftrightarrow$  alle positiven Rechtfertigungen ableitbar und alle neg. Hinderungsgründe nicht ableitbar.\\
+Begründung-Verwendung: zeiteffektiver als Netz-Neuberechnung\\
+Hauptproblem: Schleifen aller Art, dann Erweiterung des JTMS-Basisalg. erforderlich\\
+\\
+%Algorithmus siehe Franz
+\\
+
+\subsection{ATMS}
+
+\section{Fuzzy Logik}
+\subsection{Grundlegende Ideen und Begriffe}
+
+Ausprägungsgrad einer Eigenschaft soll modellierbar sein.\\
+\\
+Bsp.: Lottogewinn(egon)\\
+\\
+Ausprägung dieser Eigenschaft wesentlich.\\
+Möglichkeiten der Modellierung
+\begin{itemize}
+ \item Gewinn als 2. Ang. (falls bekannt)
+ \item Zufallsgröße Gewinn
+ \item Beschreibung von Lottogewinner als unscharfen Begriff (Fuzzy-Menge)
+\end{itemize}
+
+Aus.-Punkt: Aufweichung von \glqq{}$\in$\grqq{}\\
+$x\in M$
+\begin{itemize}
+ \item gilt
+ \item gilt ziemlich stark
+ \item gilt ein wenig
+\end{itemize}
+
+
+
+Lit.: Zadek: Fuzzy Sets (1965)\\
+\\
+Fuzzy-Mengen-Begriff\\
+\\
+Geg. Grundmenge X\\
+Funktion $\mu_M:\rightarrow[0,1]$\\
+Die \glqq{}Fuzzy-Menge M in X\grqq{} wird gegeben durch $\{x,\mu_M(x)\}$\\
+$\mu_M(x)$ heißt Zugehörigkeitsfunktion\\
+Int.:
+$\mu_M(x)$ bedeutet: $x\in M$ im Grade $\mu_M(x)$\\
+
+Spezialfall der klassischen Menge:\\
+$\uparrow$\\
+$\mu_M(x)=1$ für $x\in M$;0 sonst\\
+Statt $\{x,\mu_M(x)\}_{x\in X}$ wird M geschrieben\\
+Bsp.: \glqq{}ein alter Mensch\grqq{}\\
+\\
+A,B geg. Fuzzy-Mengen\\
+Fuzzy-Mengen-Relationen\\
+\begin{description}
+ \item[Teilmengen:] $A\subseteq B \leftrightarrow \forall_x\mu_A(x)\leq\mu_B(x)$
+ \item[Gleicheit:] $A=B\leftrightarrow\forall_x\mu_A(x)=\mu_B(x)$
+\end{description}
+Operationen mit Fuzzy-Mengen:
+\begin{description}
+ \item[Komplement:] $B=\bar{A} \leftrightarrow \forall_x \mu_B(x) = 1-\mu_A(x)$
+ \item[Vereinigung:] $\mu_{A\cup B}(x) = max\,\{\mu_A(x),\mu_B(x)\}$
+ \item[Durchschnitt:] $\mu_{A\cap B}(x) = min\,\{\mu_A(x),\mu_B(x)\} $
+\end{description}
+Fuzzy-Optimierung:\\
+Zielfunktion zu minimieren\\
+Zulässiger Bereich ist jetzt unscharfe Menge\\
+Optimum könnte knapp neben dem \glqq{}richtigen\grqq{} zulässigen Bereich liegen\\
+Modellierung durch Fuzzy-Menge und höhere \glqq{}Kosten\grqq{} neben dem \glqq{}richtigen\grqq{} zulässigen Bereich\\
+Z$\rightarrow Min $ neue Aufgabe\\
+Z + Strafterm $\leftarrow$ umso größer, je mehr der \glqq{}richtige\grqq{} zul. Bereich verletzt wird.\\
+\\
+Fuzzy-Logik\\
+Relationen bzw. Prädikate werden als Fuzzy-Mengen modelliert\\
+$\rightarrow$ Graduierung  von Wahrheitswerten in [0,1]\\
+Anwendung in der Steuerungstheorie\\
+\\
+Possibility-Theorie\\
+eine Grundlage für das \glqq{}approximative Schließen\grqq{}\\
+Regeln zur Komb. von Fuzzy-Regeln $\rightarrow$ mit Berechnung der Möglichkeit\\
+\\
+Satz 3.2
+
+
+
+
+
+
+\end{document}
