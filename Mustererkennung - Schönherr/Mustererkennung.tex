@@ -12,9 +12,12 @@
 \newcommand{\Nb}[1]{\textbf{#1}}
 \newcommand{\itemd}[1]{\item{\textbf{#1}} }
 \usepackage{pgf}
+\begin{flushleft}
+
+\end{flushleft}
 \usepackage{tikz}
 \usetikzlibrary{arrows, automata, positioning, shapes, fit}
-%\usepackage{enumitem} 
+\usepackage{enumitem} 
 \usepackage{todonotes} 
 
 %opening
@@ -904,7 +907,7 @@ Betrachten von Spezialfällen:
 	Keine Kosten $K_{oi}$, wiel es keine echte Klasse $K_0$ gibt, aber $G_0$\\
 	i.A. Rückweisungskosten > Fehlkassifikations-Kosten\\
 	häufiger Spezialfall:\\
-	$$ k_{0i} = k' K_{ij} = k | k' > k , i \neq 0 $$
+	$$ k_{i0} = k'    k_{ij} = k     k' > k , i \neq 0 $$
 	
 	Verallgemeinerung der Opt.-Bedingung auf Aufg. mit Rückweiseg möglich.\\
 	
@@ -912,7 +915,7 @@ Betrachten von Spezialfällen:
 		$$f(x|Y=1) = \frac{e^{-\frac{1}{2}\cdot(x-m_i)^T\cdot \text{Cov}_i^{-1}\cdot(x-m_i)}}{(2\pi)^\frac{n}{2}\sqrt{(\det(\text{Cov}_i)}}$$
 		Mit $m_i=E(X|Y=i)$ und der bedingten Kovarianzmatrix:
 		$$\text{Cov}_i=E{[(X'-m_i)\cdot(X'-m_i)^T]}$$
-		$$ (n,m) \text{-Matrix, } X' \text{-Zufallsvektor mit Dichte } f(x|Y=1) $$
+		$$ (n,m) \text{-Matrix, } X' \text{-Zufallsvektor mit Dichte } f(x|Y=i) $$
 		Diskriminanzfunktion  $d_i(x)=f(x|Y=i)\cdot P(Y=i)$ ist zu
 		kompliziert, deswegen:
 		$$ln(d_i(x))=-0.5\cdot(x-m_i)^T\cdot\text{Cov}_i^{-1}\cdot(x-m_i)-\underbrace{\frac{n}{2}\cdot\ln(2\pi)}_{\text{unabhängig von i}}-0.5\cdot\ln(\det(\text{Cov}_i))+\ln(P(Y=i))$$
